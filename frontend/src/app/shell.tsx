@@ -10,7 +10,14 @@ export const AppShell: React.FC<PropsWithChildren> = ({ children }) => {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
 
-          {children}
+          <main
+            className="
+              flex min-w-0 flex-1 flex-col
+              bg-[hsl(var(--workspace))]
+            "
+          >
+            {children}
+          </main>
         </div>
       </div>
     </div>
