@@ -7,6 +7,8 @@ export const createWorkspaceTab = (
   return {
     id: nanoid(),
 
+    layout: "vertical",
+
     protocol,
 
     title: "New Request",

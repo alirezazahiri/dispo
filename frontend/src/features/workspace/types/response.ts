@@ -1,3 +1,5 @@
+import { KeyValuePair } from ".";
+
 export type ResponseStatus = "idle" | "loading" | "success" | "error";
 
 export type ResponseData = {
@@ -11,7 +13,7 @@ export type ResponseData = {
 
   size?: number;
 
-  headers?: Record<string, string>;
+  headers?: Omit<KeyValuePair, "enabled">[];
 
   cookies?: Record<string, string>;
 

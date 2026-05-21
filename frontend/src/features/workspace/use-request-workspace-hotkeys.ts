@@ -1,8 +1,8 @@
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { useWorkspaceStore } from "./stores";
+import { useWorkspaceCreateTab } from "./stores";
 
 export const useRequestWorkspaceHotkeys = () => {
-  const createTab = useWorkspaceStore((state) => state.createTab);
+  const createTab = useWorkspaceCreateTab();
 
   useHotkeys(
     [

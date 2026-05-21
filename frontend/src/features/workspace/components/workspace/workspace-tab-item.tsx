@@ -1,19 +1,21 @@
 import { X } from "lucide-react";
-
 import type { RequestTab } from "@/features/workspace/types";
-
-import { useWorkspaceStore } from "@/features/workspace/stores";
+import {
+  useActiveWorkspaceTab,
+  useWorkspaceCloseTab,
+  useWorkspaceSetActiveTab,
+} from "@/features/workspace/stores";
 
 type Props = {
   tab: RequestTab;
 };
 
 export function WorkspaceTabItem({ tab }: Props) {
-  const activeTabId = useWorkspaceStore((state) => state.activeTabId);
-  const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
-  const closeTab = useWorkspaceStore((state) => state.closeTab);
+  const activeTab = useActiveWorkspaceTab();
+  const closeTab = useWorkspaceCloseTab();
+  const setActiveTab = useWorkspaceSetActiveTab();
 
-  const isActive = activeTabId === tab.id;
+  const isActive = activeTab?.id === tab.id;
 
   return (
     <div

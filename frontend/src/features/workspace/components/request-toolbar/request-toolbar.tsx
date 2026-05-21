@@ -1,9 +1,5 @@
 import { SendHorizonal, Loader2 } from "lucide-react";
-
-import type { RequestTab, HttpMethod, KeyValuePair } from "../../types";
-
-import { useWorkspaceStore } from "../../stores";
-
+import type { RequestTab, HttpMethod } from "../../types";
 import {
   Button,
   Input,
@@ -15,6 +11,9 @@ import {
 } from "@/components";
 import { useSendHttpRequest } from "../../hooks";
 import { toast } from "sonner";
+import { normalizeHeaders } from "@/lib/utils";
+import { getErrorMessage } from "@/components/providers";
+import { useWorkspaceUpdateTab } from "../../stores";
 
 type Props = {
   tab: RequestTab;
@@ -23,7 +22,7 @@ type Props = {
 const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 export function RequestToolbar({ tab }: Props) {
-  const updateTab = useWorkspaceStore((state) => state.updateTab);
+  const updateTab = useWorkspaceUpdateTab();
 
   const { mutateAsync: sendHttpRequest, isPending } = useSendHttpRequest();
 
@@ -57,6 +56,11 @@ export function RequestToolbar({ tab }: Props) {
     });
 
     try {
+      updateTab(tab.id, {
+        response: {
+          status: "loading",
+        },
+      });
       const response = await sendHttpRequest({
         id: tab.id,
 
@@ -93,7 +97,9 @@ export function RequestToolbar({ tab }: Props) {
 
           body: response.body,
 
-          headers: response.headers,
+          headers: normalizeHeaders(response.headers),
+
+          error: response.error,
         },
 
         isSending: false,
@@ -101,11 +107,28 @@ export function RequestToolbar({ tab }: Props) {
         isDirty: false,
       });
     } catch (error) {
-      console.error(error);
-
-      toast.error("Request failed");
+      console.log({ error });
+      const message = getErrorMessage(error);
 
       updateTab(tab.id, {
+        response: {
+          status: "error",
+
+          statusCode: 0,
+
+          statusText: "Network Error",
+
+          timeMs: 0,
+
+          size: 0,
+
+          body: "",
+
+          headers: [],
+
+          error: message,
+        },
+
         isSending: false,
       });
     }

@@ -4,6 +4,14 @@ import { persist } from "zustand/middleware";
 import type { RequestTab, WorkspaceProtocol } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
 
+type WorkspaceLayout = "vertical" | "horizontal";
+
+type WorkspaceUiState = {
+  layout: WorkspaceLayout;
+
+  setLayout: (layout: WorkspaceLayout) => void;
+};
+
 type WorkspaceStore = {
   tabs: RequestTab[];
 
@@ -20,9 +28,11 @@ type WorkspaceStore = {
 
 const initialTab = createWorkspaceTab();
 
-export const useWorkspaceStore = create<WorkspaceStore>()(
+export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
   persist(
     (set, get) => ({
+      layout: "vertical",
+
       tabs: [initialTab],
 
       activeTabId: initialTab.id,
@@ -68,6 +78,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       setActiveTab: (tabId) => {
         set({
           activeTabId: tabId,
+        });
+      },
+
+      setLayout: (orientation) => {
+        set({
+          layout: orientation,
         });
       },
 

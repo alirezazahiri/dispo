@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 
 import {
   Button,

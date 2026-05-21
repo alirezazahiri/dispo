@@ -7,46 +7,42 @@ import {
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { PropsWithChildren, useState } from "react";
-
 import { toast } from "sonner";
 
-export function QueryProvider({ children }: PropsWithChildren) {
-  const [queryClient] = useState(() => {
-    return new QueryClient({
-      queryCache: new QueryCache({
-        onError: (error) => {
-          toast.error(getErrorMessage(error));
-        },
-      }),
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  }),
 
-      defaultOptions: {
-        queries: {
-          retry: false,
+  defaultOptions: {
+    queries: {
+      retry: false,
 
-          refetchOnWindowFocus: false,
-        },
+      refetchOnWindowFocus: false,
+    },
 
-        mutations: {
-          retry: false,
+    mutations: {
+      retry: false,
 
-          onError: (error) => {
-            toast.error(getErrorMessage(error));
-          },
-        },
+      onError: (error) => {
+        toast.error(getErrorMessage(error));
       },
-    });
-  });
+    },
+  },
+});
 
+export function QueryProvider({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }
 
-function getErrorMessage(error: unknown) {
+export function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }

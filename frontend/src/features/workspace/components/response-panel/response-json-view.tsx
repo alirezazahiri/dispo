@@ -6,7 +6,6 @@ type Props = {
 };
 
 export function ResponseJsonView({ tab }: Props) {
-  console.log("as;kdfhkls")
   if (!tab.response?.body) {
     return null;
   }

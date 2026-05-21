@@ -1,27 +1,30 @@
-import * as React from "react";
-import { Copy, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { DataTable, DataTableColumnHeader } from "@/components/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Input, Button } from "@/components";
+import { RequestTab } from "../../types";
+import { CopyButton } from "@/components/shared";
 
 type HeaderRow = {
   key: string;
-
   value: string;
 };
 
 type Props = {
-  headers: HeaderRow[];
+  tab: RequestTab;
 };
 
-export function ResponseHeadersView({ headers }: Props) {
-  const [query, setQuery] = React.useState("");
+export function ResponseHeadersView({ tab }: Props) {
+  const headers = tab.response?.headers || [];
 
-  const filteredHeaders = React.useMemo(() => {
+  const [query, setQuery] = useState("");
+
+  const filteredHeaders = useMemo(() => {
     if (!query.trim()) {
       return headers;
     }
-
+    console.log({ headers });
     const normalized = query.toLowerCase();
 
     return headers.filter(
@@ -31,7 +34,7 @@ export function ResponseHeadersView({ headers }: Props) {
     );
   }, [headers, query]);
 
-  const columns = React.useMemo<ColumnDef<HeaderRow>[]>(
+  const columns = useMemo<ColumnDef<HeaderRow>[]>(
     () => [
       {
         accessorKey: "key",
@@ -75,17 +78,7 @@ export function ResponseHeadersView({ headers }: Props) {
             >
               {row.original.value}
             </div>
-
-            <Button
-              size="icon"
-              variant="ghost"
-              className="
-                  h-7 w-7 shrink-0
-                "
-              onClick={() => navigator.clipboard.writeText(row.original.value)}
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
+            <CopyButton variant="icon" value={row.original.value} />
           </div>
         ),
       },

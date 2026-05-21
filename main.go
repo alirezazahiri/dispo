@@ -16,7 +16,6 @@ var assets embed.FS
 func main() {
 	httpService := httpclient.NewHTTPService()
 
-	// Create application with options
 	err := wails.Run(&options.App{
 		Title:     "dispo",
 		Width:     1440,

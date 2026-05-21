@@ -1,14 +1,14 @@
 import type { RequestTab } from "../../types";
-import { useWorkspaceStore } from "../../stores";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components";
 import { MonacoBaseEditor } from "@/components/shared";
+import { useWorkspaceUpdateTab } from "../../stores";
 
 type Props = {
   tab: RequestTab;
 };
 
 export function RequestEditor({ tab }: Props) {
-  const updateTab = useWorkspaceStore((state) => state.updateTab);
+  const updateTab = useWorkspaceUpdateTab();
 
   const handleBodyChange = (value: string) => {
     updateTab(tab.id, {

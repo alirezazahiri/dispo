@@ -4,6 +4,7 @@ import type { HttpRequestPayload } from "@/lib/backend/types";
 
 export function useSendHttpRequest() {
   return useMutation({
+    mutationKey: ["send-http-request"],
     mutationFn: (payload: HttpRequestPayload) =>
       backendClient.sendHttpRequest(payload),
   });

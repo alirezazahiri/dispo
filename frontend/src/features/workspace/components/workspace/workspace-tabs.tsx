@@ -1,14 +1,12 @@
 import { Plus } from "lucide-react";
-
 import { Button, Separator } from "@/components";
 import { DragScrollArea } from "@/components/shared";
-
-import { useWorkspaceStore } from "../../stores";
+import { useWorkspaceCreateTab, useWorkspaceTabs } from "../../stores";
 import { WorkspaceTabItem } from "./workspace-tab-item";
 
 export function WorkspaceTabs() {
-  const tabs = useWorkspaceStore((state) => state.tabs);
-  const createTab = useWorkspaceStore((state) => state.createTab);
+  const tabs = useWorkspaceTabs();
+  const createTab = useWorkspaceCreateTab();
 
   return (
     <>

@@ -17,10 +17,14 @@ func NewHTTPService() *HTTPService {
 	return &HTTPService{}
 }
 
-func (a *HTTPService) SendHttpRequest(req api.HttpRequestPayload) (*api.HttpResponsePayload, error) {
+func (a *HTTPService) SendHttpRequest(
+	req api.HttpRequestPayload,
+) (*api.HttpResponsePayload, error) {
 	start := time.Now()
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+	}
 
 	request, err := http.NewRequest(
 		req.Method,
@@ -28,11 +32,18 @@ func (a *HTTPService) SendHttpRequest(req api.HttpRequestPayload) (*api.HttpResp
 		strings.NewReader(req.Body),
 	)
 
-	request.Header.Set("User-Agent", "dispo/1.0")
-
 	if err != nil {
-		return nil, err
+		return &api.HttpResponsePayload{
+			Status:     0,
+			StatusText: "Invalid Request",
+			Headers:    map[string]string{},
+			Body:       "",
+			Duration:   time.Since(start).Milliseconds(),
+			Error:      err.Error(),
+		}, nil
 	}
+
+	request.Header.Set("User-Agent", "dispo/1.0")
 
 	for key, value := range req.Headers {
 		request.Header.Set(key, value)
@@ -41,12 +52,30 @@ func (a *HTTPService) SendHttpRequest(req api.HttpRequestPayload) (*api.HttpResp
 	response, err := client.Do(request)
 
 	if err != nil {
-		return nil, err
+		return &api.HttpResponsePayload{
+			Status:     0,
+			StatusText: "Network Error",
+			Headers:    map[string]string{},
+			Body:       "",
+			Duration:   time.Since(start).Milliseconds(),
+			Error:      err.Error(),
+		}, nil
 	}
 
 	defer response.Body.Close()
 
-	body, _ := io.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
+
+	if err != nil {
+		return &api.HttpResponsePayload{
+			Status:     response.StatusCode,
+			StatusText: response.Status,
+			Headers:    map[string]string{},
+			Body:       "",
+			Duration:   time.Since(start).Milliseconds(),
+			Error:      err.Error(),
+		}, nil
+	}
 
 	headers := map[string]string{}
 
@@ -60,6 +89,7 @@ func (a *HTTPService) SendHttpRequest(req api.HttpRequestPayload) (*api.HttpResp
 		Headers:    headers,
 		Body:       string(body),
 		Duration:   time.Since(start).Milliseconds(),
+		Error:      "",
 	}, nil
 }
 

@@ -14,4 +14,5 @@ type HttpResponsePayload struct {
 	Headers    map[string]string `json:"headers"`
 	Body       string            `json:"body"`
 	Duration   int64             `json:"duration"`
+	Error      string            `json:"error,omitempty"`
 }

@@ -8,3 +8,5 @@ export * from "./select";
 export * from "./input";
 export * from "./table";
 export * from "./dropdown-menu";
+export * from "./badge";
+export * from "./scroll-area";

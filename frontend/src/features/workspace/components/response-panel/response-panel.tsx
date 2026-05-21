@@ -86,15 +86,23 @@ export function ResponsePanel({ tab }: Props) {
             </TabsTrigger>
           </TabsList>
 
-          <ResponseMetaBar tab={tab} />
+          {tab.layout == "vertical" && tab.response?.status !== "loading" && (
+            <ResponseMetaBar tab={tab} />
+          )}
         </div>
+
+        {tab.layout == "horizontal" && tab.response?.status !== "loading" && (
+          <div className="backdrop-blur-sm flex items-center justify-center py-2">
+            <ResponseMetaBar tab={tab} />
+          </div>
+        )}
 
         <TabsContent value="response" className="mt-0 min-h-0 flex-1">
           <ResponseContent tab={tab} />
         </TabsContent>
 
         <TabsContent value="headers" className="mt-0 min-h-0 flex-1">
-          <ResponseHeadersView headers={tab.headers} />
+          <ResponseHeadersView tab={tab} />
         </TabsContent>
 
         <TabsContent value="cookies" className="mt-0 min-h-0 flex-1">
@@ -125,7 +133,7 @@ function ResponseContent({ tab }: Props) {
       <div
         className="
           flex h-full items-center justify-center
-          text-sm text-destructive
+          text-sm text-destructive text-center
         "
       >
         {response.error}

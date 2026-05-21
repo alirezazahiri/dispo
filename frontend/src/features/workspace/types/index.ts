@@ -2,6 +2,8 @@ import type { ResponseData } from "./response";
 
 export type WorkspaceProtocol = "http" | "websocket" | "sse" | "grpc";
 
+export type WorkspaceLayout = "vertical" | "horizontal";
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type KeyValuePair = {
@@ -16,6 +18,8 @@ export type KeyValuePair = {
 
 export type RequestTab = {
   id: string;
+
+  layout: WorkspaceLayout;
 
   protocol: WorkspaceProtocol;
 

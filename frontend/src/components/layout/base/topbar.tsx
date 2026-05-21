@@ -3,7 +3,7 @@ import {
   SidebarToggleButton,
   SettingsButton,
 } from "@/components/shared";
-import { SearchBar } from "@/features/searchbar";
+// import { SearchBar } from "@/features/searchbar";
 
 export function Topbar() {
   return (

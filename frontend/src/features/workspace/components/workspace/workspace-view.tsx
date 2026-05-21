@@ -1,13 +1,9 @@
-import { useWorkspaceStore } from "../../stores";
+import { useActiveWorkspaceTab, useWorkspaceTabs } from "../../stores";
 import { RequestToolbar } from "../request-toolbar";
 import { WorkspacePanels } from "./workspace-panels";
 
 export function WorkspaceView() {
-  const tabs = useWorkspaceStore((state) => state.tabs);
-
-  const activeTabId = useWorkspaceStore((state) => state.activeTabId);
-
-  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const activeTab = useActiveWorkspaceTab();
 
   if (!activeTab) {
     return null;
