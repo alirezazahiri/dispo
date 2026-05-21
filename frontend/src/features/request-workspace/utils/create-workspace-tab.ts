@@ -1,9 +1,5 @@
 import { nanoid } from "nanoid";
-
-import type {
-  RequestTab,
-  WorkspaceProtocol,
-} from "@/features/request-workspace/types";
+import { RequestTab, WorkspaceProtocol } from "../types";
 
 export const createWorkspaceTab = (
   protocol: WorkspaceProtocol = "http",
@@ -18,6 +14,14 @@ export const createWorkspaceTab = (
     method: "GET",
 
     url: "",
+
+    body: "",
+
+    headers: [],
+
+    queryParams: [],
+
+    isSending: false,
 
     isDirty: false,
 

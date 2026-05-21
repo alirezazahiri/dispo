@@ -4,6 +4,7 @@ import { HotkeysProvider, ThemeProvider } from "@/components/providers";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components";
 import "@fontsource/inter";
+import "@fontsource/jetbrains-mono";
 import "@/style.css";
 
 import { App } from "./pages";
@@ -21,6 +22,7 @@ root.render(
             <Route index element={<App />} />
           </Routes>
         </BrowserRouter>
+
         <Toaster />
       </HotkeysProvider>
     </ThemeProvider>

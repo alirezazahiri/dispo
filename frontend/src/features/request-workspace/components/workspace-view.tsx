@@ -1,8 +1,6 @@
-import { useWorkspaceStore } from "@/features/request-workspace/stores/workspace.store";
-
+import { useWorkspaceStore } from "../stores";
 import { RequestToolbar } from "./request-toolbar";
-import { RequestEditor } from "./request-editor";
-import { ResponsePanel } from "./response-panel";
+import { WorkspacePanels } from "./workspace-panels";
 
 export function WorkspaceView() {
   const tabs = useWorkspaceStore((state) => state.tabs);
@@ -19,11 +17,7 @@ export function WorkspaceView() {
     <>
       <RequestToolbar tab={activeTab} />
 
-      <div className="grid min-h-0 flex-1 grid-rows-2">
-        <RequestEditor tab={activeTab} />
-
-        <ResponsePanel tab={activeTab} />
-      </div>
+      <WorkspacePanels tab={activeTab} />
     </>
   );
 }

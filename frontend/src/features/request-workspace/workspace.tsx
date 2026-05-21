@@ -1,5 +1,3 @@
-// src/features/request-workspace/workspace.tsx
-
 import { WorkspaceTabs } from "./components";
 import { WorkspaceView } from "./components";
 

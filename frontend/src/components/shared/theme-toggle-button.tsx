@@ -1,5 +1,3 @@
-// src/components/shared/theme-toggle-button.tsx
-
 import { Moon, Sun } from "lucide-react";
 
 import { Button } from "@/components";
