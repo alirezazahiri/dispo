@@ -1,5 +1,6 @@
-import { Sidebar, Topbar } from "@/components/layout/base";
+import { Sidebar } from "@/features/sidebar";
 import { PropsWithChildren } from "react";
+import { Topbar } from "./topbar";
 
 export const AppShell: React.FC<PropsWithChildren> = ({ children }) => {
   return (

@@ -25,7 +25,8 @@ export function Topbar() {
         </div>
       </div>
 
-      <SearchBar />
+      {/* TODO: add searchbar support */}
+      {/* <SearchBar /> */}
 
       <div className="flex items-center gap-1">
         <ThemeToggleButton />
