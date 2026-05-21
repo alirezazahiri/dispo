@@ -10,9 +10,7 @@ type Props = {
 
 export function WorkspaceTabItem({ tab }: Props) {
   const activeTabId = useWorkspaceStore((state) => state.activeTabId);
-
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
-
   const closeTab = useWorkspaceStore((state) => state.closeTab);
 
   const isActive = activeTabId === tab.id;

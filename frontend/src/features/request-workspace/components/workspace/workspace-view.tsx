@@ -1,5 +1,5 @@
-import { useWorkspaceStore } from "../stores";
-import { RequestToolbar } from "./request-toolbar";
+import { useWorkspaceStore } from "../../stores";
+import { RequestToolbar } from "../request-toolbar";
 import { WorkspacePanels } from "./workspace-panels";
 
 export function WorkspaceView() {

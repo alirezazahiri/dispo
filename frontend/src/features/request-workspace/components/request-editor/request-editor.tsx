@@ -1,5 +1,5 @@
-import type { RequestTab } from "../types";
-import { useWorkspaceStore } from "../stores";
+import type { RequestTab } from "../../types";
+import { useWorkspaceStore } from "../../stores";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components";
 import { MonacoBaseEditor } from "@/components/shared";
 

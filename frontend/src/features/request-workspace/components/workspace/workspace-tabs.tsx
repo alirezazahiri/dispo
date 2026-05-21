@@ -9,7 +9,6 @@ import { WorkspaceTabItem } from "./workspace-tab-item";
 
 export function WorkspaceTabs() {
   const tabs = useWorkspaceStore((state) => state.tabs);
-
   const createTab = useWorkspaceStore((state) => state.createTab);
 
   return (

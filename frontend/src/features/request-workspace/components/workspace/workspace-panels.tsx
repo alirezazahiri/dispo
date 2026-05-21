@@ -1,9 +1,7 @@
 import { Panel, Group, Separator } from "react-resizable-panels";
-
-import type { RequestTab } from "../types";
-
-import { RequestEditor } from "../components/request-editor";
-import { ResponsePanel } from "../components/response-panel";
+import type { RequestTab } from "../../types";
+import { RequestEditor } from "../request-editor/request-editor";
+import { ResponsePanel } from "../response-panel";
 
 type Props = {
   tab: RequestTab;
@@ -22,7 +20,7 @@ export function WorkspacePanels({ tab }: Props) {
 
       <ResizeHandle />
 
-      <Panel defaultSize={45} minSize={55} className="min-h-0">
+      <Panel defaultSize={55} minSize={55} className="min-h-0">
         <ResponsePanel tab={tab} />
       </Panel>
     </Group>

@@ -1,5 +1,5 @@
 import React from "react";
-import { RequestTab } from "../types";
+import { RequestTab } from "../../types";
 
 type ResponsePanelProps = {
   tab: RequestTab;

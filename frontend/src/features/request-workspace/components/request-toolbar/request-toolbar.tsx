@@ -1,8 +1,8 @@
 import { SendHorizonal, Loader2 } from "lucide-react";
 
-import type { RequestTab, HttpMethod } from "../types";
+import type { RequestTab, HttpMethod } from "../../types";
 
-import { useWorkspaceStore } from "../stores";
+import { useWorkspaceStore } from "../../stores";
 
 import {
   Button,
@@ -46,7 +46,7 @@ export function RequestToolbar({ tab }: Props) {
 
     try {
       /**
-       * temporary fake request
+       * TODO: send real requests
        */
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
