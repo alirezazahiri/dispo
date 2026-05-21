@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components";
 import "@fontsource/inter";
 import "@fontsource/jetbrains-mono";
+import "react18-json-view/src/style.css";
 import "@/style.css";
 
 import { App } from "./pages";

@@ -11,7 +11,7 @@ export const AppShell: React.FC<PropsWithChildren> = ({ children }) => {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
 
-          <main className="flex min-h-0 flex-1 max-w-full flex-col bg-[hsl(var(--workspace))]">
+          <main className="flex min-h-0 min-w-0 overflow-hidden flex-1 max-w-full flex-col bg-[hsl(var(--workspace))]">
             {children}
           </main>
         </div>

@@ -49,15 +49,16 @@ export function RequestToolbar({ tab }: Props) {
        * TODO: send real requests
        */
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
 
       updateTab(tab.id, {
         response: {
-          status: 200,
+          status: "success",
           statusText: "OK",
-          duration: 124,
           size: 1024,
-          data: {
+          timeMs: 127,
+          statusCode: 200,
+          body: {
             success: true,
           },
         },

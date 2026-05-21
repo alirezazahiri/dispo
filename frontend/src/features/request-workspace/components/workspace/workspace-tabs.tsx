@@ -1,10 +1,9 @@
 import { Plus } from "lucide-react";
 
-import { Button } from "@/components";
-import { Separator } from "@/components";
+import { Button, Separator } from "@/components";
+import { DragScrollArea } from "@/components/shared";
 
-import { useWorkspaceStore } from "@/features/request-workspace/stores";
-
+import { useWorkspaceStore } from "../../stores";
 import { WorkspaceTabItem } from "./workspace-tab-item";
 
 export function WorkspaceTabs() {
@@ -20,10 +19,20 @@ export function WorkspaceTabs() {
           bg-card px-2
         "
       >
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <WorkspaceTabItem key={tab.id} tab={tab} />
-          ))}
+        <div
+          className="
+            min-w-0 flex-1 overflow-hidden
+          "
+        >
+          <DragScrollArea
+            className="
+              flex h-full items-center gap-1
+            "
+          >
+            {tabs.map((tab) => (
+              <WorkspaceTabItem key={tab.id} tab={tab} />
+            ))}
+          </DragScrollArea>
         </div>
 
         <Button

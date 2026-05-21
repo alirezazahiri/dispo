@@ -20,7 +20,7 @@ export function WorkspaceTabItem({ tab }: Props) {
       onClick={() => setActiveTab(tab.id)}
       className={`
         group flex h-8 items-center gap-2 rounded-md
-        border px-3 text-sm transition-colors
+        border px-3 text-sm transition-colors shrink-0
 
         ${
           isActive

@@ -1,5 +1,4 @@
 import Editor from "@monaco-editor/react";
-
 import { useTheme } from "@/hooks/use-theme";
 import { MonacoBaseEditorSkeleton } from "./skeleton";
 

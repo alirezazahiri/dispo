@@ -1,3 +1,5 @@
+import type { ResponseData } from "./response";
+
 export type WorkspaceProtocol = "http" | "websocket" | "sse" | "grpc";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -29,17 +31,7 @@ export type RequestTab = {
 
   queryParams: KeyValuePair[];
 
-  response?: {
-    status: number;
-
-    statusText: string;
-
-    duration: number;
-
-    size: number;
-
-    data: unknown;
-  };
+  response?: ResponseData;
 
   isSending: boolean;
 

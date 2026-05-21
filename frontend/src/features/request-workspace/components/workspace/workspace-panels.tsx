@@ -1,4 +1,9 @@
-import { Panel, Group, Separator } from "react-resizable-panels";
+import {
+  Panel,
+  Group,
+  Separator,
+  useDefaultLayout,
+} from "react-resizable-panels";
 import type { RequestTab } from "../../types";
 import { RequestEditor } from "../request-editor/request-editor";
 import { ResponsePanel } from "../response-panel";
@@ -8,19 +13,25 @@ type Props = {
 };
 
 export function WorkspacePanels({ tab }: Props) {
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "request-workspace-panels",
+    storage: localStorage,
+  });
   return (
     <Group
       orientation="vertical"
-      autoSave="request-workspace-panels"
       className="min-h-0 flex-1"
+      draggable
+      defaultLayout={defaultLayout}
+      onLayoutChange={onLayoutChanged}
     >
-      <Panel defaultSize={55} minSize={55} className="min-h-0">
+      <Panel defaultSize={55} minSize="20%" className="min-h-0">
         <RequestEditor tab={tab} />
       </Panel>
 
       <ResizeHandle />
 
-      <Panel defaultSize={55} minSize={55} className="min-h-0">
+      <Panel defaultSize={55} minSize="20%" className="min-h-0">
         <ResponsePanel tab={tab} />
       </Panel>
     </Group>
