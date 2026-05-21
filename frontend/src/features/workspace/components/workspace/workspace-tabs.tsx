@@ -14,19 +14,26 @@ export function WorkspaceTabs() {
     <>
       <div
         className="
-          flex h-11 shrink-0 items-center
+          relative flex h-11 shrink-0 items-center
           border-b border-border
           bg-card px-2
         "
       >
+        {/* left fade */}
         <div
           className="
-            min-w-0 flex-1 overflow-hidden
+            pointer-events-none absolute left-0 top-0 z-10
+            h-full w-8
+            bg-gradient-to-r
+            from-card to-transparent
           "
-        >
+        />
+
+        {/* tabs */}
+        <div className="min-w-0 flex-1 overflow-hidden">
           <DragScrollArea
             className="
-              flex h-full items-center gap-1
+              scrollbar-hidden flex h-full items-center gap-1
             "
           >
             {tabs.map((tab) => (
@@ -34,6 +41,16 @@ export function WorkspaceTabs() {
             ))}
           </DragScrollArea>
         </div>
+
+        {/* right fade */}
+        <div
+          className="
+            pointer-events-none absolute right-10 top-0 z-10
+            h-full w-8
+            bg-gradient-to-l
+            from-card to-transparent
+          "
+        />
 
         <Button
           size="icon"
