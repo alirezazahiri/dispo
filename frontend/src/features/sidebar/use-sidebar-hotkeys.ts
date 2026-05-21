@@ -15,7 +15,6 @@ export const useSidebarHotkeys = () => {
           toggleSidebar();
         },
       },
-
       {
         id: "toggle-sidebar-windows",
         combo: "ctrl+b",

@@ -1,7 +1,9 @@
-import { Search, Settings } from "lucide-react";
-
-import { Button, Kbd, KbdGroup } from "@/components";
-import { ThemeToggleButton, SidebarToggleButton } from "@/components/shared";
+import {
+  ThemeToggleButton,
+  SidebarToggleButton,
+  SettingsButton,
+} from "@/components/shared";
+import { SearchBar } from "@/features/searchbar";
 
 export function Topbar() {
   return (
@@ -23,44 +25,12 @@ export function Topbar() {
         </div>
       </div>
 
-      <div className="flex w-full max-w-md items-center px-6">
-        <button
-          className="
-            flex h-9 w-full items-center gap-2
-            rounded-md border border-input
-            bg-background px-3
-            text-sm text-muted-foreground
-            transition-colors
-            hover:bg-accent
-            hover:text-foreground
-          "
-        >
-          <Search className="h-4 w-4 shrink-0" />
-
-          <span>Search requests...</span>
-
-          <KbdGroup>
-            <Kbd>⌘</Kbd>
-            <Kbd>K</Kbd>
-          </KbdGroup>
-        </button>
-      </div>
+      <SearchBar />
 
       <div className="flex items-center gap-1">
         <ThemeToggleButton />
 
-        <Button
-          size="icon"
-          variant="ghost"
-          className="
-            h-8 w-8
-            text-muted-foreground
-            hover:bg-accent
-            hover:text-foreground
-          "
-        >
-          <Settings className="h-4 w-4" />
-        </Button>
+        <SettingsButton />
       </div>
     </header>
   );

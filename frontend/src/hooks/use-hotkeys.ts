@@ -6,6 +6,7 @@ import {
   keyboardEventToHotkey,
   normalizeHotkey,
 } from "@/lib/hotkeys";
+import { toast } from "sonner";
 
 type UseHotkeysOptions = {
   disableInsideInputs?: boolean;
@@ -20,7 +21,7 @@ export const useHotkeys = (
       if (options?.disableInsideInputs && isInputLikeElement(event.target)) {
         return;
       }
-
+      
       const pressed = keyboardEventToHotkey(event);
 
       for (const hotkey of hotkeys) {
