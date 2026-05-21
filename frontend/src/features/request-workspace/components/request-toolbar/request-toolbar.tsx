@@ -49,9 +49,19 @@ export function RequestToolbar({ tab }: Props) {
        * TODO: send real requests
        */
 
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       updateTab(tab.id, {
+        headers: [
+          { id: "1", key: "x-request-id", value: "100", enabled: false },
+          {
+            id: "1",
+            key: "x-request-auth",
+            value: "test-auth-header-value",
+            enabled: false,
+          },
+          { id: "1", key: "x-request-role", value: "admin", enabled: false },
+        ],
         response: {
           status: "success",
           statusText: "OK",

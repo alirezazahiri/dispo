@@ -6,3 +6,5 @@ export * from "./sonner";
 export * from "./tabs";
 export * from "./select";
 export * from "./input";
+export * from "./table";
+export * from "./dropdown-menu";

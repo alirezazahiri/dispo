@@ -94,7 +94,7 @@ export function ResponsePanel({ tab }: Props) {
         </TabsContent>
 
         <TabsContent value="headers" className="mt-0 min-h-0 flex-1">
-          <ResponseHeadersView tab={tab} />
+          <ResponseHeadersView headers={tab.headers} />
         </TabsContent>
 
         <TabsContent value="cookies" className="mt-0 min-h-0 flex-1">
