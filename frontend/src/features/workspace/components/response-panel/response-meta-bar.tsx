@@ -33,7 +33,7 @@ export function ResponseMetaBar({ tab }: Props) {
       >
         <Wifi className="h-3 w-3" />
 
-        {response.statusCode}
+        {!!response.statusCode && response.statusCode}
 
         {response.statusText && (
           <span className="opacity-70">{response.statusText}</span>

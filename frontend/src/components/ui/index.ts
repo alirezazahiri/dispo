@@ -10,3 +10,5 @@ export * from "./table";
 export * from "./dropdown-menu";
 export * from "./badge";
 export * from "./scroll-area";
+export * from "./checkbox";
+export * from "./hover-card";

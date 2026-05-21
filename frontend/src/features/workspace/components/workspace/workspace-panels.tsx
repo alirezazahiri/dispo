@@ -17,11 +17,10 @@ type Props = {
 export function WorkspacePanels({ tab }: Props) {
   const isVertical = tab.layout === "vertical";
 
-  const { defaultLayout, onLayoutChanged } =
-    useDefaultLayout({
-      id: `workspace-panels-${tab.layout}`,
-      storage: localStorage,
-    });
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: `workspace-panels-${tab.layout}`,
+    storage: localStorage,
+  });
 
   return (
     <Group
@@ -31,11 +30,7 @@ export function WorkspacePanels({ tab }: Props) {
       defaultLayout={defaultLayout}
       onLayoutChange={onLayoutChanged}
     >
-      <Panel
-        defaultSize={55}
-        minSize="20%"
-        className="min-h-0 min-w-0"
-      >
+      <Panel defaultSize={55} minSize="20%" className="min-h-0 min-w-0">
         <RequestEditor tab={tab} />
       </Panel>
 
@@ -43,7 +38,7 @@ export function WorkspacePanels({ tab }: Props) {
 
       <Panel
         defaultSize={45}
-        minSize="20%"
+        minSize={isVertical ? "20%" : "30%"}
         className="min-h-0 min-w-0"
       >
         <ResponsePanel tab={tab} />
@@ -56,9 +51,7 @@ type ResizeHandleProps = {
   vertical: boolean;
 };
 
-function ResizeHandle({
-  vertical,
-}: ResizeHandleProps) {
+function ResizeHandle({ vertical }: ResizeHandleProps) {
   return (
     <Separator
       className={`

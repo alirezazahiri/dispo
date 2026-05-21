@@ -1,19 +1,24 @@
 import { SendHorizonal, Loader2 } from "lucide-react";
-import type { RequestTab, HttpMethod } from "../../types";
+import type { RequestTab, HttpMethod, KeyValuePair } from "../../types";
 import {
   Button,
-  Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components";
+import { TemplateHighlightInput } from "@/components/shared";
 import { useSendHttpRequest } from "../../hooks";
 import { toast } from "sonner";
 import { normalizeHeaders } from "@/lib/utils";
 import { getErrorMessage } from "@/components/providers";
-import { useWorkspaceUpdateTab } from "../../stores";
+import {
+  useActiveEnvironment,
+  useWorkspaceEnvironments,
+  useWorkspaceSetActiveEnvironment,
+  useWorkspaceUpdateTab,
+} from "../../stores";
 
 type Props = {
   tab: RequestTab;
@@ -23,6 +28,10 @@ const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 export function RequestToolbar({ tab }: Props) {
   const updateTab = useWorkspaceUpdateTab();
+  const environments = useWorkspaceEnvironments();
+  const activeEnvironment = useActiveEnvironment();
+  const setActiveEnvironment = useWorkspaceSetActiveEnvironment();
+  const templateValues = createVariableMap(activeEnvironment?.variables ?? []);
 
   const { mutateAsync: sendHttpRequest, isPending } = useSendHttpRequest();
 
@@ -56,6 +65,49 @@ export function RequestToolbar({ tab }: Props) {
     });
 
     try {
+      const variableMap = createVariableMap(activeEnvironment?.variables ?? []);
+      const unresolvedVariables = new Set<string>();
+
+      const url = resolveTemplate(tab.url, variableMap, unresolvedVariables);
+      const body = resolveTemplate(tab.body, variableMap, unresolvedVariables);
+
+      const resolvedQueryParams = tab.queryParams
+        .filter((param) => param.enabled && param.key.trim())
+        .map((param) => ({
+          key: resolveTemplate(param.key, variableMap, unresolvedVariables),
+          value: resolveTemplate(param.value, variableMap, unresolvedVariables),
+        }));
+
+      const resolvedHeaders = (
+        tab.headers
+          ?.filter((header) => header.enabled && header.key.trim())
+          .map((header) => ({
+            key: resolveTemplate(header.key, variableMap, unresolvedVariables),
+            value: resolveTemplate(header.value, variableMap, unresolvedVariables),
+          })) ?? []
+      ).reduce<Record<string, string>>((acc, header) => {
+        if (header.key.trim()) {
+          acc[header.key] = header.value;
+        }
+        return acc;
+      }, {});
+
+      if (tab.auth.type === "bearer" && tab.auth.bearerToken.trim()) {
+        resolvedHeaders.Authorization = `Bearer ${resolveTemplate(
+          tab.auth.bearerToken,
+          variableMap,
+          unresolvedVariables,
+        )}`;
+      }
+
+      const resolvedUrl = appendQueryParams(url, resolvedQueryParams);
+
+      if (unresolvedVariables.size) {
+        toast.warning(
+          `Unresolved variables: ${Array.from(unresolvedVariables).join(", ")}`,
+        );
+      }
+
       updateTab(tab.id, {
         response: {
           status: "loading",
@@ -66,18 +118,11 @@ export function RequestToolbar({ tab }: Props) {
 
         method: tab.method,
 
-        url: tab.url,
+        url: resolvedUrl,
 
-        headers:
-          tab.headers
-            ?.filter((header) => header.enabled && header.key)
-            .reduce<Record<string, string>>((acc, header) => {
-              acc[header.key] = header.value;
+        headers: resolvedHeaders,
 
-              return acc;
-            }, {}) ?? {},
-
-        body: tab.body,
+        body,
       });
 
       updateTab(tab.id, {
@@ -97,7 +142,11 @@ export function RequestToolbar({ tab }: Props) {
 
           body: response.body,
 
+          rawBody: response.body,
+
           headers: normalizeHeaders(response.headers),
+
+          cookies: response.cookies ?? [],
 
           error: response.error,
         },
@@ -124,7 +173,11 @@ export function RequestToolbar({ tab }: Props) {
 
           body: "",
 
+          rawBody: "",
+
           headers: [],
+
+          cookies: [],
 
           error: message,
         },
@@ -145,7 +198,17 @@ export function RequestToolbar({ tab }: Props) {
     >
       <MethodSelect value={tab.method} onChange={handleMethodChange} />
 
-      <UrlInput value={tab.url} onChange={handleUrlChange} />
+      <UrlInput
+        value={tab.url}
+        onChange={handleUrlChange}
+        templateValues={templateValues}
+      />
+
+      <EnvironmentSelect
+        environments={environments}
+        activeEnvironmentId={activeEnvironment?.id}
+        onSelect={setActiveEnvironment}
+      />
 
       <Button
         onClick={handleSendRequest}
@@ -175,6 +238,84 @@ export function RequestToolbar({ tab }: Props) {
   );
 }
 
+type EnvironmentSelectProps = {
+  environments: Array<{ id: string; name: string }>;
+  activeEnvironmentId?: string;
+  onSelect: (environmentId: string) => void;
+};
+
+function EnvironmentSelect({
+  environments,
+  activeEnvironmentId,
+  onSelect,
+}: EnvironmentSelectProps) {
+  return (
+    <div className="flex items-center gap-2 min-w-[180px]">
+      <Select value={activeEnvironmentId} onValueChange={onSelect}>
+        <SelectTrigger>
+          <SelectValue placeholder="Environment" />
+        </SelectTrigger>
+        <SelectContent>
+          {environments.map((environment) => (
+            <SelectItem key={environment.id} value={environment.id}>
+              {environment.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function createVariableMap(variables: KeyValuePair[]) {
+  return variables.reduce<Record<string, string>>((acc, variable) => {
+    const key = variable.key.trim();
+    if (variable.enabled && key) {
+      acc[key] = variable.value;
+    }
+    return acc;
+  }, {});
+}
+
+function resolveTemplate(
+  value: string,
+  variableMap: Record<string, string>,
+  unresolvedVariables: Set<string>,
+) {
+  return value.replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_, variableName: string) => {
+    if (Object.prototype.hasOwnProperty.call(variableMap, variableName)) {
+      return variableMap[variableName];
+    }
+    unresolvedVariables.add(variableName);
+    return `{{${variableName}}}`;
+  });
+}
+
+function appendQueryParams(
+  url: string,
+  params: Array<{ key: string; value: string }>,
+) {
+  if (!params.length) {
+    return url;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    params.forEach((param) => {
+      parsedUrl.searchParams.set(param.key, param.value);
+    });
+    return parsedUrl.toString();
+  } catch {
+    const [baseUrl, existingQuery = ""] = url.split("?");
+    const searchParams = new URLSearchParams(existingQuery);
+    params.forEach((param) => {
+      searchParams.set(param.key, param.value);
+    });
+    const query = searchParams.toString();
+    return query ? `${baseUrl}?${query}` : baseUrl;
+  }
+}
+
 type MethodSelectProps = {
   value: HttpMethod;
   onChange: (method: HttpMethod) => void;
@@ -201,14 +342,17 @@ type UrlInputProps = {
   value: string;
 
   onChange: (value: string) => void;
+  templateValues: Record<string, string>;
 };
 
-function UrlInput({ value, onChange }: UrlInputProps) {
+function UrlInput({ value, onChange, templateValues }: UrlInputProps) {
   return (
-    <Input
+    <TemplateHighlightInput
       value={value}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={onChange}
       placeholder="https://api.example.com/users"
+      className="w-full"
+      templateValues={templateValues}
     />
   );
 }

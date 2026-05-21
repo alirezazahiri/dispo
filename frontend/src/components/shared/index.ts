@@ -4,3 +4,5 @@ export * from "./settings-button";
 export * from "./monaco-base-editor";
 export * from "./drag-scroll-area";
 export * from "./copy-button";
+export * from "./template-highlight-input";
+export * from "./key-value-rows-editor";

@@ -16,6 +16,19 @@ export type KeyValuePair = {
   enabled: boolean;
 };
 
+export type RequestAuthType = "none" | "bearer";
+
+export type RequestAuth = {
+  type: RequestAuthType;
+  bearerToken: string;
+};
+
+export type Environment = {
+  id: string;
+  name: string;
+  variables: KeyValuePair[];
+};
+
 export type RequestTab = {
   id: string;
 
@@ -35,6 +48,8 @@ export type RequestTab = {
 
   queryParams: KeyValuePair[];
 
+  auth: RequestAuth;
+
   response?: ResponseData;
 
   isSending: boolean;
@@ -44,4 +59,11 @@ export type RequestTab = {
   createdAt: number;
 
   updatedAt: number;
+};
+
+export type WorkspaceState = {
+  tabs: RequestTab[];
+  activeTabId: string;
+  environments: Environment[];
+  activeEnvironmentId: string;
 };

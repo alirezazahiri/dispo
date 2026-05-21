@@ -3,6 +3,8 @@ package httpclient
 import (
 	"context"
 	"dispo/backend/api"
+	"dispo/backend/workspace"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -10,11 +12,19 @@ import (
 )
 
 type HTTPService struct {
-	ctx context.Context
+	ctx            context.Context
+	workspaceStore *workspace.Repository
 }
 
 func NewHTTPService() *HTTPService {
-	return &HTTPService{}
+	repo, err := workspace.NewRepository()
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize workspace repository: %v", err))
+	}
+
+	return &HTTPService{
+		workspaceStore: repo,
+	}
 }
 
 func (a *HTTPService) SendHttpRequest(
@@ -37,6 +47,7 @@ func (a *HTTPService) SendHttpRequest(
 			Status:     0,
 			StatusText: "Invalid Request",
 			Headers:    map[string]string{},
+			Cookies:    []api.ResponseCookiePayload{},
 			Body:       "",
 			Duration:   time.Since(start).Milliseconds(),
 			Error:      err.Error(),
@@ -56,6 +67,7 @@ func (a *HTTPService) SendHttpRequest(
 			Status:     0,
 			StatusText: "Network Error",
 			Headers:    map[string]string{},
+			Cookies:    []api.ResponseCookiePayload{},
 			Body:       "",
 			Duration:   time.Since(start).Milliseconds(),
 			Error:      err.Error(),
@@ -71,6 +83,7 @@ func (a *HTTPService) SendHttpRequest(
 			Status:     response.StatusCode,
 			StatusText: response.Status,
 			Headers:    map[string]string{},
+			Cookies:    []api.ResponseCookiePayload{},
 			Body:       "",
 			Duration:   time.Since(start).Milliseconds(),
 			Error:      err.Error(),
@@ -83,10 +96,25 @@ func (a *HTTPService) SendHttpRequest(
 		headers[key] = strings.Join(values, ", ")
 	}
 
+	cookies := make([]api.ResponseCookiePayload, 0, len(response.Cookies()))
+	for _, cookie := range response.Cookies() {
+		cookies = append(cookies, api.ResponseCookiePayload{
+			Name:     cookie.Name,
+			Value:    cookie.Value,
+			Domain:   cookie.Domain,
+			Path:     cookie.Path,
+			Expires:  cookie.Expires.Format(time.RFC3339),
+			HTTPOnly: cookie.HttpOnly,
+			Secure:   cookie.Secure,
+			SameSite: sameSiteToString(cookie.SameSite),
+		})
+	}
+
 	return &api.HttpResponsePayload{
 		Status:     response.StatusCode,
 		StatusText: response.Status,
 		Headers:    headers,
+		Cookies:    cookies,
 		Body:       string(body),
 		Duration:   time.Since(start).Milliseconds(),
 		Error:      "",
@@ -95,4 +123,30 @@ func (a *HTTPService) SendHttpRequest(
 
 func (s *HTTPService) Startup(ctx context.Context) {
 	s.ctx = ctx
+}
+
+func (s *HTTPService) LoadWorkspaceState() (*api.WorkspaceStatePayload, error) {
+	state, err := s.workspaceStore.LoadState()
+	if err != nil {
+		return nil, err
+	}
+
+	return &state, nil
+}
+
+func (s *HTTPService) SaveWorkspaceState(state api.WorkspaceStatePayload) error {
+	return s.workspaceStore.SaveState(state)
+}
+
+func sameSiteToString(value http.SameSite) string {
+	switch value {
+	case http.SameSiteStrictMode:
+		return "Strict"
+	case http.SameSiteLaxMode:
+		return "Lax"
+	case http.SameSiteNoneMode:
+		return "None"
+	default:
+		return ""
+	}
 }

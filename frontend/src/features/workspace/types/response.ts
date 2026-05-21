@@ -2,6 +2,17 @@ import { KeyValuePair } from ".";
 
 export type ResponseStatus = "idle" | "loading" | "success" | "error";
 
+export type ResponseCookie = {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: string;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: string;
+};
+
 export type ResponseData = {
   status: ResponseStatus;
 
@@ -15,7 +26,7 @@ export type ResponseData = {
 
   headers?: Omit<KeyValuePair, "enabled">[];
 
-  cookies?: Record<string, string>;
+  cookies?: ResponseCookie[];
 
   body?: unknown;
 

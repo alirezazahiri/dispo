@@ -54,7 +54,7 @@ export const Sidebar = () => {
           <SidebarItem
             icon={<FolderKanban className="h-4 w-4" />}
             label="Collections"
-            active
+            to="/"
           />
 
           <SidebarItem icon={<Clock3 className="h-4 w-4" />} label="History" />
@@ -64,6 +64,7 @@ export const Sidebar = () => {
           <SidebarItem
             icon={<Globe className="h-4 w-4" />}
             label="Environments"
+            to="/environments"
           />
         </div>
 

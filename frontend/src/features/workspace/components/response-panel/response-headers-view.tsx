@@ -24,7 +24,6 @@ export function ResponseHeadersView({ tab }: Props) {
     if (!query.trim()) {
       return headers;
     }
-    console.log({ headers });
     const normalized = query.toLowerCase();
 
     return headers.filter(
