@@ -1,12 +1,7 @@
-import {
-  Command,
-  PanelLeft,
-  Search,
-  Settings,
-} from "lucide-react";
+import { Search, Settings } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { ThemeToggleButton } from "@/components/shared";
+import { Button } from "@/components";
+import { ThemeToggleButton, SidebarToggleButton } from "@/components/shared";
 
 export function Topbar() {
   return (
@@ -19,33 +14,11 @@ export function Topbar() {
       "
     >
       <div className="flex items-center gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="
-            h-8 w-8
-            text-muted-foreground
-            hover:bg-accent
-            hover:text-foreground
-          "
-        >
-          <PanelLeft className="h-4 w-4" />
-        </Button>
+        <SidebarToggleButton />
 
         <div className="flex items-center gap-2">
-          <div
-            className="
-              flex h-7 w-7 items-center justify-center
-              rounded-md
-              bg-primary
-              text-primary-foreground
-            "
-          >
-            <Command className="h-4 w-4" />
-          </div>
-
-          <span className="text-sm font-medium tracking-tight text-foreground">
-            Dispo 🪩
+          <span className="text-sm font-medium tracking-wider text-foreground">
+            DISPO ✨
           </span>
         </div>
       </div>

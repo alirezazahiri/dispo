@@ -1,3 +1,3 @@
-export * from "./sidebar";
+export * from "../../sidebar/sidebar";
 export * from "./topbar";
-export * from "./workspace";
+export * from "../../../features/request-workspace/workspace";

@@ -1,8 +1,10 @@
+import App from "@/App";
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { HotkeysProvider, ThemeProvider } from "@/components/providers";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import "@fontsource/inter";
 import "@/style.css";
-import App from "@/App";
-import { ThemeProvider } from "@/components/providers";
 
 const container = document.getElementById("root");
 
@@ -11,7 +13,13 @@ const root = createRoot(container!);
 root.render(
   <React.StrictMode>
     <ThemeProvider>
-      <App />
+      <HotkeysProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route index element={<App />} />
+          </Routes>
+        </BrowserRouter>
+      </HotkeysProvider>
     </ThemeProvider>
   </React.StrictMode>,
 );

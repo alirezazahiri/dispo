@@ -1,6 +1,7 @@
-import { Sidebar, Topbar , RequestWorkspace } from "@/components/layout/base";
+import { Sidebar, Topbar } from "@/components/layout/base";
+import { PropsWithChildren } from "react";
 
-export function AppShell() {
+export const AppShell: React.FC<PropsWithChildren> = ({ children }) => {
   return (
     <div className="h-screen w-screen overflow-hidden">
       <div className="flex h-full flex-col">
@@ -9,9 +10,9 @@ export function AppShell() {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
 
-          <RequestWorkspace />
+          {children}
         </div>
       </div>
     </div>
   );
-}
+};

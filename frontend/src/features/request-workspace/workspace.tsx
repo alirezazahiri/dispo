@@ -1,10 +1,6 @@
-import {
-  Plus,
-  SendHorizonal,
-  X,
-} from "lucide-react";
+import { Plus, SendHorizonal, X } from "lucide-react";
 
-import { Button, Separator } from "@/components/ui";
+import { Button, Separator } from "@/components";
 
 export function RequestWorkspace() {
   return (
@@ -120,7 +116,6 @@ function RequestToolbar() {
 
       <Button className="gap-2">
         <SendHorizonal className="h-4 w-4" />
-
         Send
       </Button>
     </div>
@@ -215,10 +210,7 @@ type WorkspaceTabProps = {
   active?: boolean;
 };
 
-function WorkspaceTab({
-  label,
-  active,
-}: WorkspaceTabProps) {
+function WorkspaceTab({ label, active }: WorkspaceTabProps) {
   return (
     <button
       className={`
