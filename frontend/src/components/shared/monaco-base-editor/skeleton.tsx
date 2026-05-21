@@ -11,7 +11,8 @@ export function MonacoBaseEditorSkeleton() {
       {/* gutter */}
       <div
         className="
-          flex w-12 shrink-0 flex-col gap-3
+          flex w-12 min-w-12 shrink-0
+          flex-col gap-3
           border-r border-border
           px-3 py-4
         "
@@ -24,7 +25,8 @@ export function MonacoBaseEditorSkeleton() {
       {/* content */}
       <div
         className="
-          flex flex-1 flex-col gap-3
+          flex min-w-0 flex-1 flex-col
+          gap-3 overflow-hidden
           px-4 py-4
         "
       >
@@ -36,7 +38,7 @@ export function MonacoBaseEditorSkeleton() {
 
         <Skeleton className="h-3 w-[35%]" />
 
-        <div className="h-3" />
+        <div className="shrink-0 h-3" />
 
         <Skeleton className="h-3 w-[90%]" />
 
@@ -44,7 +46,7 @@ export function MonacoBaseEditorSkeleton() {
 
         <Skeleton className="h-3 w-[72%]" />
 
-        <div className="h-3" />
+        <div className="shrink-0 h-3" />
 
         <Skeleton className="h-3 w-[40%]" />
 

@@ -79,7 +79,7 @@ export function DragScrollArea({ className, children, ...props }: Props) {
       onWheel={handleWheel}
       className={cn(
         `
-          scrollbar-hidden
+          
           cursor-grab
           overflow-x-auto
           overflow-y-hidden

@@ -1,8 +1,8 @@
 import { X } from "lucide-react";
 
-import type { RequestTab } from "@/features/request-workspace/types";
+import type { RequestTab } from "@/features/workspace/types";
 
-import { useWorkspaceStore } from "@/features/request-workspace/stores";
+import { useWorkspaceStore } from "@/features/workspace/stores";
 
 type Props = {
   tab: RequestTab;

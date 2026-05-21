@@ -6,13 +6,22 @@ type Props = {
 };
 
 export function ResponseJsonView({ tab }: Props) {
+  console.log("as;kdfhkls")
+  if (!tab.response?.body) {
+    return null;
+  }
+
   return (
     <div
       className="
         h-full overflow-auto p-4 scroll-area
       "
     >
-      <JsonView src={tab.response?.body ?? {}} theme="github" dark={true} />
+      <JsonView
+        src={JSON.parse(tab.response?.body as any) ?? {}}
+        theme="github"
+        dark={true}
+      />
     </div>
   );
 }

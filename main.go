@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"dispo/backend/httpclient"
 	"embed"
 
 	"github.com/wailsapp/wails/v2"
@@ -12,8 +14,7 @@ import (
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
-	app := NewApp()
+	httpService := httpclient.NewHTTPService()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -31,9 +32,11 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup: app.startup,
+		OnStartup: func(ctx context.Context) {
+			httpService.Startup(ctx)
+		},
 		Bind: []interface{}{
-			app,
+			httpService,
 		},
 	})
 
