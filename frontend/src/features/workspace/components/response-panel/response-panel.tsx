@@ -10,6 +10,7 @@ import { ResponseCookiesView } from "./response-cookies-view";
 import { ResponseRawView } from "./response-raw-view";
 import { ResponseLoading } from "./response-loading";
 import { ResponseData } from "../../types/response";
+import { ResponseRequestDetailsView } from "./response-request-details-view";
 
 type Props = {
   tab: RequestTab;
@@ -41,6 +42,19 @@ export function ResponsePanel({ tab }: Props) {
               h-8 bg-transparent p-0
             "
           >
+            {!!tab.response?.requestSnapshot && (
+              <TabsTrigger
+                value="request"
+                className="
+                h-8 rounded-md px-3
+                data-[state=active]:bg-accent
+                data-[state=active]:shadow-none
+              "
+              >
+                Request
+              </TabsTrigger>
+            )}
+
             <TabsTrigger
               value="response"
               className="
@@ -112,6 +126,12 @@ export function ResponsePanel({ tab }: Props) {
         <TabsContent value="raw" className="mt-0 min-h-0 flex-1">
           <ResponseRawView tab={tab} />
         </TabsContent>
+
+        {!!tab.response?.requestSnapshot && (
+          <TabsContent value="request" className="mt-0 min-h-0 flex-1">
+            <ResponseRequestDetailsView tab={tab} />
+          </TabsContent>
+        )}
       </Tabs>
     </section>
   );

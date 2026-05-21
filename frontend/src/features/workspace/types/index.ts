@@ -4,7 +4,7 @@ export type WorkspaceProtocol = "http" | "websocket" | "sse" | "grpc";
 
 export type WorkspaceLayout = "vertical" | "horizontal";
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD";
 
 export type KeyValuePair = {
   id: string;

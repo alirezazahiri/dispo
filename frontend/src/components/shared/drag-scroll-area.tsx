@@ -89,8 +89,7 @@ export function DragScrollArea({
       onWheel={handleWheel}
       className={cn(
         `
-          
-          cursor-grab
+          cursor-pointer
           overflow-x-auto
           overflow-y-hidden
           select-none

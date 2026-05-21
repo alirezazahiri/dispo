@@ -13,6 +13,19 @@ export type ResponseCookie = {
   sameSite: string;
 };
 
+export type RequestSnapshot = {
+  method: string;
+  url: string;
+  host: string;
+  contentType: string;
+  contentLength: number;
+  userAgent: string;
+  authorization: string;
+  headersCount: number;
+  queryParamsCount: number;
+  body: string;
+};
+
 export type ResponseData = {
   status: ResponseStatus;
 
@@ -31,6 +44,8 @@ export type ResponseData = {
   body?: unknown;
 
   rawBody?: string;
+
+  requestSnapshot?: RequestSnapshot;
 
   error?: string;
 };

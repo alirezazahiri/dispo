@@ -13,6 +13,7 @@ import { useSendHttpRequest } from "../../hooks";
 import { toast } from "sonner";
 import { normalizeHeaders } from "@/lib/utils";
 import { getErrorMessage } from "@/components/providers";
+import type { RequestSnapshot } from "../../types/response";
 import {
   useActiveEnvironment,
   useWorkspaceEnvironments,
@@ -24,7 +25,7 @@ type Props = {
   tab: RequestTab;
 };
 
-const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
 export function RequestToolbar({ tab }: Props) {
   const updateTab = useWorkspaceUpdateTab();
@@ -64,6 +65,8 @@ export function RequestToolbar({ tab }: Props) {
       isSending: true,
     });
 
+    let requestSnapshot: RequestSnapshot | undefined;
+
     try {
       const variableMap = createVariableMap(activeEnvironment?.variables ?? []);
       const unresolvedVariables = new Set<string>();
@@ -101,6 +104,13 @@ export function RequestToolbar({ tab }: Props) {
       }
 
       const resolvedUrl = appendQueryParams(url, resolvedQueryParams);
+      requestSnapshot = buildRequestSnapshot({
+        method: tab.method,
+        url: resolvedUrl,
+        headers: resolvedHeaders,
+        body,
+        queryParamsCount: resolvedQueryParams.length,
+      });
 
       if (unresolvedVariables.size) {
         toast.warning(
@@ -111,6 +121,7 @@ export function RequestToolbar({ tab }: Props) {
       updateTab(tab.id, {
         response: {
           status: "loading",
+          requestSnapshot,
         },
       });
       const response = await sendHttpRequest({
@@ -148,6 +159,8 @@ export function RequestToolbar({ tab }: Props) {
 
           cookies: response.cookies ?? [],
 
+          requestSnapshot,
+
           error: response.error,
         },
 
@@ -178,6 +191,8 @@ export function RequestToolbar({ tab }: Props) {
           headers: [],
 
           cookies: [],
+
+          requestSnapshot,
 
           error: message,
         },
@@ -313,6 +328,53 @@ function appendQueryParams(
     });
     const query = searchParams.toString();
     return query ? `${baseUrl}?${query}` : baseUrl;
+  }
+}
+
+function buildRequestSnapshot(input: {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body: string;
+  queryParamsCount: number;
+}): RequestSnapshot {
+  const normalizedHeaders = Object.entries(input.headers).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      acc[key.toLowerCase()] = value;
+      return acc;
+    },
+    {},
+  );
+
+  const authorization = normalizedHeaders.authorization || "Not set";
+  const userAgent = normalizedHeaders["user-agent"] || "dispo/1.0";
+  const contentType = normalizedHeaders["content-type"] || "Not set";
+  const contentLength = new TextEncoder().encode(input.body || "").length;
+  const host = extractHost(input.url);
+
+  return {
+    method: input.method,
+    url: input.url,
+    host,
+    contentType,
+    contentLength,
+    userAgent,
+    authorization,
+    headersCount: Object.keys(input.headers).length,
+    queryParamsCount: input.queryParamsCount,
+    body: input.body || "",
+  };
+}
+
+function extractHost(url: string) {
+  if (!url) {
+    return "Not set";
+  }
+
+  try {
+    return new URL(url).host;
+  } catch {
+    return "Invalid URL";
   }
 }
 

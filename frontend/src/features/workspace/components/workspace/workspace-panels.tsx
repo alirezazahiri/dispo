@@ -38,7 +38,7 @@ export function WorkspacePanels({ tab }: Props) {
 
       <Panel
         defaultSize={45}
-        minSize={isVertical ? "20%" : "30%"}
+        minSize={isVertical ? "20%" : "35%"}
         className="min-h-0 min-w-0"
       >
         <ResponsePanel tab={tab} />
