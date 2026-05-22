@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"dispo/backend/collections"
-	"dispo/backend/httpclient"
+	"dispo/backend/httpservice"
 	"dispo/backend/scripting"
 	"embed"
 	"log"
@@ -18,7 +18,7 @@ var assets embed.FS
 
 func main() {
 	collectionsService := collections.NewService()
-	httpService := httpclient.NewHTTPService()
+	httpService := httpservice.NewHTTPService()
 	scriptService := scripting.NewService()
 
 	err := wails.Run(&options.App{

@@ -28,6 +28,11 @@ type CollectionsStore = {
   renameFolder: (id: string, collectionId: string, name: string) => Promise<void>;
   deleteFolder: (id: string, collectionId: string) => Promise<void>;
 
+  createRequest: (
+    collectionId: string,
+    folderId?: string | null,
+    name?: string,
+  ) => Promise<SavedRequest>;
   renameRequest: (id: string, collectionId: string, name: string) => Promise<void>;
   duplicateRequest: (id: string, collectionId: string) => Promise<SavedRequest>;
   upsertRequest: (savedRequest: SavedRequest) => void;
@@ -246,6 +251,41 @@ export const useCollectionsStore = create<CollectionsStore>()(
             expandedNodeIds: nextExpandedNodeIds,
           };
         });
+      },
+
+      createRequest: async (collectionId, folderId = null, name = "New Request") => {
+        const created = await backendClient.collections.saveRequest({
+          id: "",
+          collectionId,
+          folderId: folderId ?? null,
+          name,
+          method: "GET",
+          url: "",
+          body: "",
+          preRequestScript: "",
+          postResponseScript: "",
+          headers: [],
+          queryParams: [],
+          auth: { type: "none", bearerToken: "" },
+          sortOrder: -1,
+          createdAt: 0,
+          updatedAt: 0,
+        });
+        set((state) => ({
+          requestsByCollection: {
+            ...state.requestsByCollection,
+            [created.collectionId]: {
+              ...(state.requestsByCollection[created.collectionId] ?? {}),
+              [created.id]: created,
+            },
+          },
+          expandedNodeIds: {
+            ...state.expandedNodeIds,
+            [created.collectionId]: true,
+            ...(created.folderId ? { [created.folderId]: true } : {}),
+          },
+        }));
+        return created;
       },
 
       renameRequest: async (id, collectionId, name) => {

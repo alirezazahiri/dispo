@@ -6,7 +6,7 @@ import {
   QueryProvider,
   ThemeProvider,
 } from "@/components/providers";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Route, Routes } from "react-router-dom";
 import { Toaster } from "@/components";
 import { BaseLayout } from "@/components/layout";
 import "@fontsource/inter";
@@ -25,7 +25,7 @@ root.render(
     <ThemeProvider>
       <QueryProvider>
         <HotkeysProvider>
-          <BrowserRouter>
+          <HashRouter>
             <AppBootstrap>
               <BaseLayout.AppShell>
                 <Routes>
@@ -35,7 +35,7 @@ root.render(
                 </Routes>
               </BaseLayout.AppShell>
             </AppBootstrap>
-          </BrowserRouter>
+          </HashRouter>
 
           <Toaster />
         </HotkeysProvider>

@@ -138,8 +138,6 @@ func (r *Repository) initSchema() error {
 		return fmt.Errorf("ensure default collection: %w", err)
 	}
 
-	// Flatten existing nested folders to match the supported tree depth:
-	// collection -> folder.
 	if _, err := r.db.Exec(`UPDATE folders SET parent_folder_id = NULL WHERE parent_folder_id IS NOT NULL`); err != nil {
 		return fmt.Errorf("flatten nested folders: %w", err)
 	}

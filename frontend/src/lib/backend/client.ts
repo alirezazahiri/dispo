@@ -1,4 +1,4 @@
-import * as HttpService from "~/wailsjs/go/httpclient/HTTPService";
+import * as HttpService from "~/wailsjs/go/httpservice/HTTPService";
 import * as CollectionsService from "~/wailsjs/go/collections/Service";
 import type {
   CollectionPayload,
@@ -20,9 +20,9 @@ export const backendClient = {
   sendHttpRequest: (payload: HttpRequestPayload) =>
     HttpService.SendHttpRequest(payload) as Promise<HttpResponsePayload>,
   loadWorkspaceState: () =>
-    (window as any).go.httpclient.HTTPService.LoadWorkspaceState() as Promise<WorkspaceStatePayload>,
+    (window as any).go.httpservice.HTTPService.LoadWorkspaceState() as Promise<WorkspaceStatePayload>,
   saveWorkspaceState: (state: WorkspaceStatePayload) =>
-    (window as any).go.httpclient.HTTPService.SaveWorkspaceState(state) as Promise<void>,
+    (window as any).go.httpservice.HTTPService.SaveWorkspaceState(state) as Promise<void>,
   runScript: (context: ScriptContextPayload) =>
     (window as any).go.scripting.Service.RunScript(context) as Promise<ScriptResultPayload>,
   collections: {

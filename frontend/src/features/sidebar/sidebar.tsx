@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
+  FilePlus,
   Folder,
   FolderOpen,
   Globe,
@@ -80,6 +81,7 @@ export const Sidebar = () => {
   const setNodeExpanded = useCollectionsStore((state) => state.setNodeExpanded);
   const createCollection = useCollectionsStore((state) => state.createCollection);
   const createFolder = useCollectionsStore((state) => state.createFolder);
+  const createRequest = useCollectionsStore((state) => state.createRequest);
   const renameCollection = useCollectionsStore((state) => state.renameCollection);
   const renameFolder = useCollectionsStore((state) => state.renameFolder);
   const renameRequest = useCollectionsStore((state) => state.renameRequest);
@@ -87,6 +89,15 @@ export const Sidebar = () => {
   const deleteCollection = useCollectionsStore((state) => state.deleteCollection);
   const deleteFolder = useCollectionsStore((state) => state.deleteFolder);
   const deleteRequest = useCollectionsStore((state) => state.deleteRequest);
+
+  const handleCreateRequest = async (
+    collectionId: string,
+    folderId: string | null,
+  ) => {
+    const created = await createRequest(collectionId, folderId);
+    navigate(`/collections/${collectionId}`);
+    openSavedRequest(created);
+  };
 
   const [createCollectionDialogOpen, setCreateCollectionDialogOpen] = useState(false);
   const [createFolderCollectionId, setCreateFolderCollectionId] = useState<string | null>(null);
@@ -202,6 +213,9 @@ export const Sidebar = () => {
                   onOpenCollection={() => navigate(`/collections/${collection.id}`)}
                   activeSavedRequestId={activeSavedRequestId}
                   onCreateFolder={() => setCreateFolderCollectionId(collection.id)}
+                  onCreateRequest={(folderId) =>
+                    handleCreateRequest(collection.id, folderId)
+                  }
                   onRenameCollection={() =>
                     setRenameCollectionTarget({
                       id: collection.id,
@@ -411,6 +425,7 @@ type CollectionNodeProps = {
   toggleExpanded: () => void;
   onOpenCollection: () => void;
   onCreateFolder: () => void;
+  onCreateRequest: (folderId: string | null) => void;
   onRenameCollection: () => void;
   onDeleteCollection: () => void;
   onRenameFolder: (folder: FolderType) => void;
@@ -433,6 +448,7 @@ function CollectionNode({
   toggleExpanded,
   onOpenCollection,
   onCreateFolder,
+  onCreateRequest,
   onRenameCollection,
   onDeleteCollection,
   onRenameFolder,
@@ -476,7 +492,7 @@ function CollectionNode({
           onClick={onOpenCollection}
         >
           {expanded ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
-          <span className="truncate">{collectionName}</span>
+          <span className="min-w-0 flex-1 truncate">{collectionName}</span>
         </button>
         <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
           <DropdownMenuTrigger asChild>
@@ -490,13 +506,17 @@ function CollectionNode({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onRenameCollection}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Rename
+            <DropdownMenuItem onClick={() => onCreateRequest(null)}>
+              <FilePlus className="mr-2 h-4 w-4" />
+              New Request
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onCreateFolder}>
               <Folder className="mr-2 h-4 w-4" />
               New Folder
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onRenameCollection}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Rename
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={onDeleteCollection}>
               <Trash2 className="mr-2 h-4 w-4" />
@@ -513,6 +533,7 @@ function CollectionNode({
             requests={requests}
             expandedNodeIds={expandedNodeIds}
             toggleNodeExpanded={toggleNodeExpanded}
+            onCreateRequest={onCreateRequest}
             onRenameFolder={onRenameFolder}
             onRenameRequest={onRenameRequest}
             onDuplicateRequest={onDuplicateRequest}
@@ -543,6 +564,7 @@ type FolderNodeProps = {
   requests: SavedRequest[];
   expandedNodeIds: Record<string, boolean>;
   toggleNodeExpanded: (id: string) => void;
+  onCreateRequest: (folderId: string | null) => void;
   onRenameFolder: (folder: FolderType) => void;
   onRenameRequest: (request: SavedRequest) => void;
   onDuplicateRequest: (requestId: string) => Promise<void>;
@@ -557,6 +579,7 @@ function FolderNode({
   requests,
   expandedNodeIds,
   toggleNodeExpanded,
+  onCreateRequest,
   onRenameFolder,
   onRenameRequest,
   onDuplicateRequest,
@@ -590,7 +613,7 @@ function FolderNode({
           onClick={() => toggleNodeExpanded(folder.id)}
         >
           {expanded ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
-          <span className="truncate">{folder.name}</span>
+          <span className="min-w-0 flex-1 truncate">{folder.name}</span>
         </button>
         <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
           <DropdownMenuTrigger asChild>
@@ -604,6 +627,10 @@ function FolderNode({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onCreateRequest(folder.id)}>
+              <FilePlus className="mr-2 h-4 w-4" />
+              New Request
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onRenameFolder(folder)}>
               <Pencil className="mr-2 h-4 w-4" />
               Rename
@@ -666,7 +693,7 @@ function RequestNode({
         onClick={() => onOpenRequest(request)}
       >
         <RequestMethodIcon method={request.method as HttpMethod} />
-        <span className="truncate">{request.name}</span>
+        <span className="min-w-0 flex-1 truncate">{request.name}</span>
       </button>
       <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
         <DropdownMenuTrigger asChild>

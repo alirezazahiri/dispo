@@ -12,6 +12,7 @@ import type {
   WorkspaceState,
 } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
+import { resolveTabTitle } from "./tab-title";
 
 type WorkspaceLayout = "vertical" | "horizontal";
 
@@ -450,11 +451,15 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
     const tab = state.tabsById[tabId];
     if (!tab) return null;
 
+    const requestsByCollection =
+      useCollectionsStore.getState().requestsByCollection;
+    const canonicalTitle = resolveTabTitle(tab, requestsByCollection);
+
     const payload = await backendClient.collections.saveRequest({
       id: tab.savedRequestId ?? "",
       collectionId: options?.collectionId ?? tab.collectionId,
       folderId: options?.folderId ?? null,
-      name: (options?.name ?? tab.title) || "New Request",
+      name: options?.name ?? canonicalTitle,
       method: tab.method,
       url: tab.url,
       body: tab.body,

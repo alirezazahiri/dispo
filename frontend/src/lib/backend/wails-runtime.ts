@@ -15,7 +15,7 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 type WailsWindow = Window & {
   go?: {
     collections?: { Service?: Record<string, unknown> };
-    httpclient?: { HTTPService?: Record<string, unknown> };
+    httpservice?: { HTTPService?: Record<string, unknown> };
     scripting?: { Service?: Record<string, unknown> };
   };
   runtime?: Record<string, unknown>;
@@ -26,7 +26,7 @@ function bindingsAreInjected(): boolean {
   return Boolean(
     w.runtime &&
       w.go?.collections?.Service &&
-      w.go?.httpclient?.HTTPService &&
+      w.go?.httpservice?.HTTPService &&
       w.go?.scripting?.Service,
   );
 }

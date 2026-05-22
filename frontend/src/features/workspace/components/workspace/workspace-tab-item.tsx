@@ -2,6 +2,7 @@ import { Check, Pencil, X } from "lucide-react";
 import type { RequestTab } from "@/features/workspace/types";
 import {
   useActiveWorkspaceTab,
+  useTabTitle,
   useWorkspaceCloseTab,
   useWorkspaceHandleRenamedSavedRequest,
   useWorkspaceSaveTabToCollection,
@@ -36,22 +37,22 @@ export function WorkspaceTabItem({ tab }: Props) {
   const saveTabToCollection = useWorkspaceSaveTabToCollection();
   const upsertRequest = useCollectionsStore((state) => state.upsertRequest);
   const renameRequest = useCollectionsStore((state) => state.renameRequest);
+  const displayTitle = useTabTitle(tab.id);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState(tab.title || "New Request");
+  const [renameValue, setRenameValue] = useState(displayTitle);
 
   const isActive = activeTab?.id === tab.id;
 
   const commitRename = async () => {
     const nextTitle = renameValue.trim();
-    const fallbackTitle = tab.title || "New Request";
     if (!nextTitle) {
-      setRenameValue(fallbackTitle);
+      setRenameValue(displayTitle);
       setIsRenaming(false);
       return;
     }
 
-    if (nextTitle !== fallbackTitle) {
+    if (nextTitle !== displayTitle) {
       if (tab.savedRequestId) {
         const collectionsState = useCollectionsStore.getState();
         const linkedCollectionId =
@@ -99,14 +100,14 @@ export function WorkspaceTabItem({ tab }: Props) {
               }
               if (event.key === "Escape") {
                 event.preventDefault();
-                setRenameValue(tab.title || "New Request");
+                setRenameValue(displayTitle);
                 setIsRenaming(false);
               }
             }}
             className="h-6 max-w-[180px]"
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate">{tab.title}</span>
+          <span className="min-w-0 flex-1 truncate">{displayTitle}</span>
         )}
 
         {isRenaming ? (
@@ -125,7 +126,7 @@ export function WorkspaceTabItem({ tab }: Props) {
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              setRenameValue(tab.title || "New Request");
+              setRenameValue(displayTitle);
               setIsRenaming(true);
             }}
             className="
