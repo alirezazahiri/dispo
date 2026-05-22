@@ -11,12 +11,17 @@ import { ResponseRawView } from "./response-raw-view";
 import { ResponseLoading } from "./response-loading";
 import { ResponseData } from "../../types/response";
 import { ResponseRequestDetailsView } from "./response-request-details-view";
+import { ResponseConsoleView } from "./response-console-view";
 
 type Props = {
   tab: RequestTab;
 };
 
 export function ResponsePanel({ tab }: Props) {
+  const hasScriptError = Boolean(
+    tab.response?.scripts?.pre?.error || tab.response?.scripts?.post?.error,
+  );
+
   return (
     <section
       className="
@@ -98,6 +103,20 @@ export function ResponsePanel({ tab }: Props) {
             >
               Raw
             </TabsTrigger>
+
+            <TabsTrigger
+              value="console"
+              className="
+                relative h-8 rounded-md px-3
+                data-[state=active]:bg-accent
+                data-[state=active]:shadow-none
+              "
+            >
+              Console
+              {hasScriptError && (
+                <span className="ml-2 h-1.5 w-1.5 rounded-full bg-destructive" />
+              )}
+            </TabsTrigger>
           </TabsList>
 
           {tab.layout == "vertical" && tab.response?.status !== "loading" && (
@@ -125,6 +144,10 @@ export function ResponsePanel({ tab }: Props) {
 
         <TabsContent value="raw" className="mt-0 min-h-0 flex-1">
           <ResponseRawView tab={tab} />
+        </TabsContent>
+
+        <TabsContent value="console" className="mt-0 min-h-0 flex-1">
+          <ResponseConsoleView tab={tab} />
         </TabsContent>
 
         {!!tab.response?.requestSnapshot && (

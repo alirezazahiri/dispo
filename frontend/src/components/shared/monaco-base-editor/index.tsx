@@ -1,4 +1,5 @@
 import Editor from "@monaco-editor/react";
+import type { Monaco } from "@monaco-editor/react";
 import { useTheme } from "@/hooks/use-theme";
 import { MonacoBaseEditorSkeleton } from "./skeleton";
 
@@ -7,6 +8,7 @@ type Props = {
   defaultLanguage?: string;
   language?: string;
   onChange: (value: string) => void;
+  beforeMount?: (monaco: Monaco) => void;
 };
 
 export function MonacoBaseEditor({
@@ -14,6 +16,7 @@ export function MonacoBaseEditor({
   onChange,
   defaultLanguage,
   language,
+  beforeMount,
 }: Props) {
   const { resolvedTheme } = useTheme();
 
@@ -24,6 +27,7 @@ export function MonacoBaseEditor({
       loading={<MonacoBaseEditorSkeleton />}
       theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
       value={value}
+      beforeMount={beforeMount}
       onChange={(value) => onChange(value ?? "")}
       options={{
         minimap: {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"dispo/backend/httpclient"
+	"dispo/backend/scripting"
 	"embed"
 
 	"github.com/wailsapp/wails/v2"
@@ -15,6 +16,7 @@ var assets embed.FS
 
 func main() {
 	httpService := httpclient.NewHTTPService()
+	scriptService := scripting.NewService()
 
 	err := wails.Run(&options.App{
 		Title:     "dispo",
@@ -36,6 +38,7 @@ func main() {
 		},
 		Bind: []interface{}{
 			httpService,
+			scriptService,
 		},
 	})
 

@@ -17,6 +17,7 @@ import {
 } from "@/components/shared";
 import { useActiveEnvironment, useWorkspaceUpdateTab } from "../../stores";
 import type { KeyValuePair, RequestAuthType } from "../../types";
+import { ScriptsTab } from "./scripts-tab";
 
 type Props = {
   tab: RequestTab;
@@ -128,6 +129,20 @@ export function RequestEditor({ tab }: Props) {
     });
   };
 
+  const handlePreRequestScriptChange = (preRequestScript: string) => {
+    updateTab(tab.id, {
+      preRequestScript,
+      isDirty: true,
+    });
+  };
+
+  const handlePostResponseScriptChange = (postResponseScript: string) => {
+    updateTab(tab.id, {
+      postResponseScript,
+      isDirty: true,
+    });
+  };
+
   return (
     <section
       className="
@@ -194,6 +209,17 @@ export function RequestEditor({ tab }: Props) {
               "
             >
               Auth
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="scripts"
+              className="
+                h-8 rounded-md px-3
+                data-[state=active]:bg-accent
+                data-[state=active]:shadow-none
+              "
+            >
+              Scripts
             </TabsTrigger>
 
           </TabsList>
@@ -278,6 +304,20 @@ export function RequestEditor({ tab }: Props) {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent
+          value="scripts"
+          className="
+            mt-0 min-h-0 flex-1
+          "
+        >
+          <ScriptsTab
+            preRequestScript={tab.preRequestScript}
+            postResponseScript={tab.postResponseScript}
+            onPreRequestScriptChange={handlePreRequestScriptChange}
+            onPostResponseScriptChange={handlePostResponseScriptChange}
+          />
         </TabsContent>
       </Tabs>
     </section>

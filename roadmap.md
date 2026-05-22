@@ -4,6 +4,6 @@
 - [x] add request auth tab [HIGH]
 - [x] add environment variables support [HIGH]
 - [x] add response cookies table [HIGH]
-- [ ] add pre-request and post-response script support PER REQUEST (each workspace-tab has its own script) [MEDIUM]
+- [x] add pre-request and post-response script support PER REQUEST (each workspace-tab has its own script) [MEDIUM]
 - [ ] add settings drawer [LOW]
 - [ ] make architecture decisions on how to support multiple protocols [LOW]

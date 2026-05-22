@@ -44,6 +44,10 @@ export type RequestTab = {
 
   body: string;
 
+  preRequestScript: string;
+
+  postResponseScript: string;
+
   headers: KeyValuePair[];
 
   queryParams: KeyValuePair[];

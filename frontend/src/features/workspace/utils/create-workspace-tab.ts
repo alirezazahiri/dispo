@@ -19,6 +19,10 @@ export const createWorkspaceTab = (
 
     body: "",
 
+    preRequestScript: "",
+
+    postResponseScript: "",
+
     headers: [],
 
     queryParams: [],

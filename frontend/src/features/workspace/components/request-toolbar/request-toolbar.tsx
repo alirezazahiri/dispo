@@ -12,6 +12,7 @@ import {
   useWorkspaceSetActiveEnvironment,
   useWorkspaceUpdateTab,
 } from "../../stores";
+import { useWorkspaceStore } from "../../stores/workspace.store";
 import { UrlInput } from "./url-input";
 import { MethodSelect } from "./method-select";
 import { EnvironmentSelect } from "./enironment-select";
@@ -21,6 +22,13 @@ import {
   appendQueryParams,
   buildRequestSnapshot,
 } from "./utils";
+import {
+  applyEnvironmentMutations,
+  runPostResponseScript,
+  runPreRequestScript,
+  type ScriptExecution,
+  type ScriptRequestState,
+} from "../../scripting";
 
 type Props = {
   tab: RequestTab;
@@ -65,38 +73,84 @@ export function RequestToolbar({ tab }: Props) {
     });
 
     let requestSnapshot: RequestSnapshot | undefined;
+    let preExecution: ScriptExecution | undefined;
+    let postExecution: ScriptExecution | undefined;
 
     try {
-      const variableMap = createVariableMap(activeEnvironment?.variables ?? []);
+      const initialRequest: ScriptRequestState = {
+        method: tab.method,
+        url: tab.url,
+        body: tab.body,
+        headers: rowsToRecord(tab.headers),
+        params: rowsToRecord(tab.queryParams),
+      };
+      const scriptEnv = {
+        name: activeEnvironment?.name ?? "",
+        variables: createVariableMap(activeEnvironment?.variables ?? []),
+      };
+      const preResult = await runPreRequestScript(tab.preRequestScript, {
+        request: initialRequest,
+        env: scriptEnv,
+      });
+      preExecution = preResult.execution;
+
+      applyEnvironmentMutations(activeEnvironment?.id, preExecution.mutations.env);
+
+      if (preExecution.error) {
+        updateTab(tab.id, {
+          response: {
+            status: "error",
+            statusCode: 0,
+            statusText: "Script Error",
+            timeMs: preExecution.durationMs,
+            size: 0,
+            body: "",
+            rawBody: "",
+            headers: [],
+            cookies: [],
+            requestSnapshot,
+            scripts: {
+              pre: preExecution,
+            },
+            error: preExecution.error,
+          },
+          isSending: false,
+        });
+        return;
+      }
+
+      const latestEnvironment = activeEnvironment?.id
+        ? useWorkspaceStore
+            .getState()
+            .environments.find((environment) => environment.id === activeEnvironment.id)
+        : undefined;
+
+      const variableMap = createVariableMap(latestEnvironment?.variables ?? []);
       const unresolvedVariables = new Set<string>();
+      const requestState = preResult.request;
 
-      const url = resolveTemplate(tab.url, variableMap, unresolvedVariables);
-      const body = resolveTemplate(tab.body, variableMap, unresolvedVariables);
+      const url = resolveTemplate(requestState.url, variableMap, unresolvedVariables);
+      const body = resolveTemplate(requestState.body, variableMap, unresolvedVariables);
 
-      const resolvedQueryParams = tab.queryParams
-        .filter((param) => param.enabled && param.key.trim())
-        .map((param) => ({
-          key: resolveTemplate(param.key, variableMap, unresolvedVariables),
-          value: resolveTemplate(param.value, variableMap, unresolvedVariables),
+      const resolvedQueryParams = Object.entries(requestState.params)
+        .filter(([key]) => key.trim())
+        .map(([key, value]) => ({
+          key: resolveTemplate(key, variableMap, unresolvedVariables),
+          value: resolveTemplate(value, variableMap, unresolvedVariables),
         }));
 
-      const resolvedHeaders = (
-        tab.headers
-          ?.filter((header) => header.enabled && header.key.trim())
-          .map((header) => ({
-            key: resolveTemplate(header.key, variableMap, unresolvedVariables),
-            value: resolveTemplate(
-              header.value,
-              variableMap,
-              unresolvedVariables,
-            ),
-          })) ?? []
-      ).reduce<Record<string, string>>((acc, header) => {
-        if (header.key.trim()) {
-          acc[header.key] = header.value;
-        }
-        return acc;
-      }, {});
+      const resolvedHeaders = Object.entries(requestState.headers).reduce<Record<string, string>>(
+        (acc, [key, value]) => {
+          const resolvedKey = resolveTemplate(key, variableMap, unresolvedVariables);
+          if (!resolvedKey.trim()) {
+            return acc;
+          }
+
+          acc[resolvedKey] = resolveTemplate(value, variableMap, unresolvedVariables);
+          return acc;
+        },
+        {},
+      );
 
       if (tab.auth.type === "bearer" && tab.auth.bearerToken.trim()) {
         resolvedHeaders.Authorization = `Bearer ${resolveTemplate(
@@ -125,12 +179,15 @@ export function RequestToolbar({ tab }: Props) {
         response: {
           status: "loading",
           requestSnapshot,
+          scripts: {
+            pre: preExecution,
+          },
         },
       });
       const response = await sendHttpRequest({
         id: tab.id,
 
-        method: tab.method,
+        method: requestState.method,
 
         url: resolvedUrl,
 
@@ -138,6 +195,33 @@ export function RequestToolbar({ tab }: Props) {
 
         body,
       });
+
+      const postResult = await runPostResponseScript(tab.postResponseScript, {
+        request: {
+          method: requestState.method,
+          url: resolvedUrl,
+          headers: resolvedHeaders,
+          params: resolvedQueryParams.reduce<Record<string, string>>((acc, param) => {
+            acc[param.key] = param.value;
+            return acc;
+          }, {}),
+          body,
+        },
+        env: {
+          name: latestEnvironment?.name ?? "",
+          variables: createVariableMap(latestEnvironment?.variables ?? []),
+        },
+        response: {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          cookies: response.cookies ?? [],
+          body: response.body,
+          durationMs: response.duration,
+        },
+      });
+      postExecution = postResult.execution;
+      applyEnvironmentMutations(activeEnvironment?.id, postExecution.mutations.env);
 
       updateTab(tab.id, {
         response: {
@@ -163,6 +247,11 @@ export function RequestToolbar({ tab }: Props) {
           cookies: response.cookies ?? [],
 
           requestSnapshot,
+
+          scripts: {
+            pre: preExecution,
+            post: postExecution,
+          },
 
           error: response.error,
         },
@@ -196,6 +285,11 @@ export function RequestToolbar({ tab }: Props) {
           cookies: [],
 
           requestSnapshot,
+
+          scripts: {
+            pre: preExecution,
+            post: postExecution,
+          },
 
           error: message,
         },
@@ -254,4 +348,20 @@ export function RequestToolbar({ tab }: Props) {
       </Button>
     </div>
   );
+}
+
+function rowsToRecord(rows: Array<{ key: string; value: string; enabled: boolean }>) {
+  return rows.reduce<Record<string, string>>((acc, row) => {
+    if (!row.enabled) {
+      return acc;
+    }
+
+    const key = row.key.trim();
+    if (!key) {
+      return acc;
+    }
+
+    acc[key] = row.value;
+    return acc;
+  }, {});
 }

@@ -19,19 +19,21 @@ type EnvironmentPayload struct {
 }
 
 type RequestTabPayload struct {
-	ID          string             `json:"id"`
-	Layout      string             `json:"layout"`
-	Protocol    string             `json:"protocol"`
-	Title       string             `json:"title"`
-	Method      string             `json:"method"`
-	URL         string             `json:"url"`
-	Body        string             `json:"body"`
-	Headers     []KeyValuePayload  `json:"headers"`
-	QueryParams []KeyValuePayload  `json:"queryParams"`
-	Auth        RequestAuthPayload `json:"auth"`
-	Response    map[string]any     `json:"response,omitempty"`
-	CreatedAt   int64              `json:"createdAt"`
-	UpdatedAt   int64              `json:"updatedAt"`
+	ID                 string             `json:"id"`
+	Layout             string             `json:"layout"`
+	Protocol           string             `json:"protocol"`
+	Title              string             `json:"title"`
+	Method             string             `json:"method"`
+	URL                string             `json:"url"`
+	Body               string             `json:"body"`
+	PreRequestScript   string             `json:"preRequestScript"`
+	PostResponseScript string             `json:"postResponseScript"`
+	Headers            []KeyValuePayload  `json:"headers"`
+	QueryParams        []KeyValuePayload  `json:"queryParams"`
+	Auth               RequestAuthPayload `json:"auth"`
+	Response           map[string]any     `json:"response,omitempty"`
+	CreatedAt          int64              `json:"createdAt"`
+	UpdatedAt          int64              `json:"updatedAt"`
 }
 
 type WorkspaceStatePayload struct {

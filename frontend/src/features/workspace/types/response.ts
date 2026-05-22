@@ -1,4 +1,5 @@
 import { KeyValuePair } from ".";
+import type { ScriptExecution } from "../scripting/types";
 
 export type ResponseStatus = "idle" | "loading" | "success" | "error";
 
@@ -46,6 +47,11 @@ export type ResponseData = {
   rawBody?: string;
 
   requestSnapshot?: RequestSnapshot;
+
+  scripts?: {
+    pre?: ScriptExecution;
+    post?: ScriptExecution;
+  };
 
   error?: string;
 };

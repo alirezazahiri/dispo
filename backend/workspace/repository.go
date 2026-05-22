@@ -119,6 +119,20 @@ func (r *Repository) initSchema() error {
 	); err != nil {
 		return err
 	}
+	if err := r.ensureColumnExists(
+		"request_tabs",
+		"pre_request_script",
+		`ALTER TABLE request_tabs ADD COLUMN pre_request_script TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"request_tabs",
+		"post_response_script",
+		`ALTER TABLE request_tabs ADD COLUMN post_response_script TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -158,8 +172,8 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 
 		if _, err = tx.Exec(
 			`INSERT INTO request_tabs (
-				id, layout, protocol, title, method, url, body, auth_type, bearer_token, response_json, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tab.ID,
 			tab.Layout,
 			tab.Protocol,
@@ -169,6 +183,8 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 			tab.Body,
 			tab.Auth.Type,
 			tab.Auth.BearerToken,
+			tab.PreRequestScript,
+			tab.PostResponseScript,
 			responseJSON,
 			tab.CreatedAt,
 			tab.UpdatedAt,
@@ -257,7 +273,7 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 	}
 
 	tabsRows, err := r.db.Query(`
-		SELECT id, layout, protocol, title, method, url, body, auth_type, bearer_token, response_json, created_at, updated_at
+		SELECT id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
 		FROM request_tabs
 		ORDER BY created_at ASC
 	`)
@@ -280,6 +296,8 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 			&tab.Body,
 			&tab.Auth.Type,
 			&tab.Auth.BearerToken,
+			&tab.PreRequestScript,
+			&tab.PostResponseScript,
 			&responseJSON,
 			&tab.CreatedAt,
 			&tab.UpdatedAt,
