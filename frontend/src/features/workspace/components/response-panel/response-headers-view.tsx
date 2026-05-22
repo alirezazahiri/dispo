@@ -123,7 +123,7 @@ export function ResponseHeadersView({ tab }: Props) {
         data={filteredHeaders}
         emptyMessage="No headers found."
         className="
-          rounded-none border-0
+          rounded-none border-0 scroll-area
         "
       />
     </div>

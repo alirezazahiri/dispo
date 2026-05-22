@@ -32,11 +32,15 @@ export type Environment = {
 export type RequestTab = {
   id: string;
 
+  collectionId: string;
+
+  savedRequestId: string | null;
+
   layout: WorkspaceLayout;
 
   protocol: WorkspaceProtocol;
 
-  title: string;
+  title?: string;
 
   method: HttpMethod;
 
@@ -67,7 +71,9 @@ export type RequestTab = {
 
 export type WorkspaceState = {
   tabs: RequestTab[];
-  activeTabId: string;
+  tabOrderByCollection: Record<string, string[]>;
+  activeTabIdByCollection: Record<string, string>;
+  currentCollectionId: string;
   environments: Environment[];
   activeEnvironmentId: string;
 };

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { nanoid } from "nanoid";
 
 import { backendClient } from "@/lib/backend/client";
+import type { SavedRequest } from "@/features/collections/types";
 import type {
   Environment,
   KeyValuePair,
@@ -11,30 +12,36 @@ import type {
 } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
 
+const DEFAULT_COLLECTION_ID = "default-collection";
+
 type WorkspaceLayout = "vertical" | "horizontal";
 
 type WorkspaceUiState = {
   layout: WorkspaceLayout;
   isReady: boolean;
-
   setLayout: (layout: WorkspaceLayout) => void;
   initialize: () => Promise<void>;
 };
 
 type WorkspaceStore = {
-  tabs: RequestTab[];
-
-  activeTabId: string;
+  tabsById: Record<string, RequestTab>;
+  tabOrderByCollection: Record<string, string[]>;
+  activeTabIdByCollection: Record<string, string>;
+  currentCollectionId: string;
   environments: Environment[];
   activeEnvironmentId: string;
 
-  createTab: (protocol?: WorkspaceProtocol) => void;
-
+  createTab: (protocol?: WorkspaceProtocol, collectionId?: string) => void;
   closeTab: (tabId: string) => void;
-
   setActiveTab: (tabId: string) => void;
-
+  setCurrentCollection: (collectionId: string) => void;
   updateTab: (tabId: string, data: Partial<RequestTab>) => void;
+  openSavedRequest: (savedRequest: SavedRequest) => void;
+  saveTabToCollection: (
+    tabId: string,
+    options?: { name?: string; folderId?: string | null; collectionId?: string },
+  ) => Promise<SavedRequest | null>;
+
   createEnvironment: () => void;
   setActiveEnvironment: (environmentId: string) => void;
   updateEnvironment: (environmentId: string, data: Partial<Environment>) => void;
@@ -48,7 +55,6 @@ type WorkspaceStore = {
   removeEnvironmentVariable: (environmentId: string, variableId: string) => void;
 };
 
-const initialTab = createWorkspaceTab();
 function createDefaultEnvironment(): Environment {
   return {
     id: nanoid(),
@@ -57,19 +63,86 @@ function createDefaultEnvironment(): Environment {
   };
 }
 
-const initialEnvironment = createDefaultEnvironment();
+function mapTabsById(tabs: RequestTab[]) {
+  return tabs.reduce<Record<string, RequestTab>>((acc, tab) => {
+    acc[tab.id] = tab;
+    return acc;
+  }, {});
+}
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function buildActiveTabByCollection(
+  tabOrderByCollection: Record<string, string[]>,
+  existing?: Record<string, string>,
+) {
+  const next: Record<string, string> = { ...(existing ?? {}) };
+  for (const [collectionId, tabIds] of Object.entries(tabOrderByCollection)) {
+    if (!tabIds.length) continue;
+    const existingActive = next[collectionId];
+    if (!existingActive || !tabIds.includes(existingActive)) {
+      next[collectionId] = tabIds[tabIds.length - 1];
+    }
+  }
+  return next;
+}
+
+function reconcileTabOrder(
+  sourceTabs: RequestTab[],
+  persistedOrder: Record<string, string[]> | undefined,
+): Record<string, string[]> {
+  const known = new Map(sourceTabs.map((tab) => [tab.id, tab]));
+  const result: Record<string, string[]> = {};
+
+  if (persistedOrder) {
+    for (const [collectionId, tabIds] of Object.entries(persistedOrder)) {
+      const filtered = tabIds.filter((id) => known.has(id));
+      if (filtered.length > 0) {
+        result[collectionId] = filtered;
+      }
+    }
+  }
+
+  const placedIds = new Set(Object.values(result).flat());
+  for (const tab of sourceTabs) {
+    if (placedIds.has(tab.id)) continue;
+    const collectionId = tab.collectionId || DEFAULT_COLLECTION_ID;
+    if (!result[collectionId]) {
+      result[collectionId] = [];
+    }
+    result[collectionId].push(tab.id);
+  }
+
+  return result;
+}
 
 function sanitizeState(state: Partial<WorkspaceState> | null | undefined): WorkspaceState {
-  const tabs = state?.tabs?.length ? state.tabs : [createWorkspaceTab()];
+  const incomingTabs = state?.tabs ?? [];
+  const sourceTabs = incomingTabs.length
+    ? incomingTabs.map((tab) => ({
+        ...tab,
+        collectionId: tab.collectionId || DEFAULT_COLLECTION_ID,
+        savedRequestId: tab.savedRequestId ?? null,
+      }))
+    : [createWorkspaceTab("http", DEFAULT_COLLECTION_ID)];
+
+  const tabOrderByCollection = reconcileTabOrder(
+    sourceTabs,
+    state?.tabOrderByCollection,
+  );
+
+  const activeTabIdByCollection = buildActiveTabByCollection(
+    tabOrderByCollection,
+    state?.activeTabIdByCollection,
+  );
+
+  const collectionIds = Object.keys(tabOrderByCollection);
+  const currentCollectionId =
+    state?.currentCollectionId && collectionIds.includes(state.currentCollectionId)
+      ? state.currentCollectionId
+      : collectionIds[0] ?? DEFAULT_COLLECTION_ID;
+
   const environments = state?.environments?.length
     ? state.environments
     : [createDefaultEnvironment()];
-
-  const activeTabId = tabs.some((tab) => tab.id === state?.activeTabId)
-    ? (state?.activeTabId as string)
-    : tabs[0].id;
 
   const activeEnvironmentId = environments.some(
     (environment) => environment.id === state?.activeEnvironmentId,
@@ -78,12 +151,20 @@ function sanitizeState(state: Partial<WorkspaceState> | null | undefined): Works
     : environments[0].id;
 
   return {
-    tabs,
-    activeTabId,
+    tabs: sourceTabs,
+    tabOrderByCollection,
+    activeTabIdByCollection,
+    currentCollectionId,
     environments,
     activeEnvironmentId,
   };
 }
+
+function serializeTabs(state: WorkspaceStore & WorkspaceUiState): RequestTab[] {
+  return Object.values(state.tabsById).sort((a, b) => a.createdAt - b.createdAt);
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleWorkspaceSave(get: () => WorkspaceStore & WorkspaceUiState) {
   if (saveTimer) {
@@ -97,8 +178,10 @@ function scheduleWorkspaceSave(get: () => WorkspaceStore & WorkspaceUiState) {
     }
 
     const payload: WorkspaceState = {
-      tabs: state.tabs,
-      activeTabId: state.activeTabId,
+      tabs: serializeTabs(state),
+      tabOrderByCollection: state.tabOrderByCollection,
+      activeTabIdByCollection: state.activeTabIdByCollection,
+      currentCollectionId: state.currentCollectionId,
       environments: state.environments,
       activeEnvironmentId: state.activeEnvironmentId,
     };
@@ -109,12 +192,43 @@ function scheduleWorkspaceSave(get: () => WorkspaceStore & WorkspaceUiState) {
   }, 250);
 }
 
+function ensureCollectionHasTab(
+  state: WorkspaceStore & WorkspaceUiState,
+  collectionId: string,
+): WorkspaceStore {
+  const collectionTabIds = state.tabOrderByCollection[collectionId] ?? [];
+  if (collectionTabIds.length) {
+    return state;
+  }
+  const nextTab = createWorkspaceTab("http", collectionId);
+  return {
+    ...state,
+    tabsById: {
+      ...state.tabsById,
+      [nextTab.id]: nextTab,
+    },
+    tabOrderByCollection: {
+      ...state.tabOrderByCollection,
+      [collectionId]: [nextTab.id],
+    },
+    activeTabIdByCollection: {
+      ...state.activeTabIdByCollection,
+      [collectionId]: nextTab.id,
+    },
+  };
+}
+
+const initialTab = createWorkspaceTab("http", DEFAULT_COLLECTION_ID);
+const initialEnvironment = createDefaultEnvironment();
+
 export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((set, get) => ({
   layout: "vertical",
   isReady: false,
 
-  tabs: [initialTab],
-  activeTabId: initialTab.id,
+  tabsById: { [initialTab.id]: initialTab },
+  tabOrderByCollection: { [DEFAULT_COLLECTION_ID]: [initialTab.id] },
+  activeTabIdByCollection: { [DEFAULT_COLLECTION_ID]: initialTab.id },
+  currentCollectionId: DEFAULT_COLLECTION_ID,
   environments: [initialEnvironment],
   activeEnvironmentId: initialEnvironment.id,
 
@@ -127,8 +241,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
       const loaded = await backendClient.loadWorkspaceState();
       const sanitized = sanitizeState(loaded);
       set({
-        tabs: sanitized.tabs,
-        activeTabId: sanitized.activeTabId,
+        tabsById: mapTabsById(sanitized.tabs),
+        tabOrderByCollection: sanitized.tabOrderByCollection,
+        activeTabIdByCollection: sanitized.activeTabIdByCollection,
+        currentCollectionId: sanitized.currentCollectionId,
         environments: sanitized.environments,
         activeEnvironmentId: sanitized.activeEnvironmentId,
         isReady: true,
@@ -137,8 +253,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
       console.error("Failed to load workspace state", error);
       const fallback = sanitizeState(null);
       set({
-        tabs: fallback.tabs,
-        activeTabId: fallback.activeTabId,
+        tabsById: mapTabsById(fallback.tabs),
+        tabOrderByCollection: fallback.tabOrderByCollection,
+        activeTabIdByCollection: fallback.activeTabIdByCollection,
+        currentCollectionId: fallback.currentCollectionId,
         environments: fallback.environments,
         activeEnvironmentId: fallback.activeEnvironmentId,
         isReady: true,
@@ -146,48 +264,83 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
     }
   },
 
-  createTab: (protocol = "http") => {
-    const tab = createWorkspaceTab(protocol);
-
+  createTab: (protocol = "http", collectionId) => {
+    const targetCollectionId = collectionId ?? get().currentCollectionId ?? DEFAULT_COLLECTION_ID;
+    const tab = createWorkspaceTab(protocol, targetCollectionId);
     set((state) => ({
-      tabs: [...state.tabs, tab],
-      activeTabId: tab.id,
+      tabsById: {
+        ...state.tabsById,
+        [tab.id]: tab,
+      },
+      tabOrderByCollection: {
+        ...state.tabOrderByCollection,
+        [targetCollectionId]: [...(state.tabOrderByCollection[targetCollectionId] ?? []), tab.id],
+      },
+      activeTabIdByCollection: {
+        ...state.activeTabIdByCollection,
+        [targetCollectionId]: tab.id,
+      },
+      currentCollectionId: targetCollectionId,
     }));
     scheduleWorkspaceSave(get);
   },
 
   closeTab: (tabId) => {
     const state = get();
+    const tab = state.tabsById[tabId];
+    if (!tab) return;
 
-    const tabs = state.tabs.filter((tab) => tab.id !== tabId);
+    const collectionId = tab.collectionId;
+    const currentOrder = state.tabOrderByCollection[collectionId] ?? [];
+    const nextOrder = currentOrder.filter((id) => id !== tabId);
+    const nextTabsById = { ...state.tabsById };
+    delete nextTabsById[tabId];
 
-    if (tabs.length === 0) {
-      const newTab = createWorkspaceTab();
+    let nextState: WorkspaceStore & WorkspaceUiState = {
+      ...state,
+      tabsById: nextTabsById,
+      tabOrderByCollection: {
+        ...state.tabOrderByCollection,
+        [collectionId]: nextOrder,
+      },
+      activeTabIdByCollection: { ...state.activeTabIdByCollection },
+    };
 
-      set({
-        tabs: [newTab],
-        activeTabId: newTab.id,
-      });
-      scheduleWorkspaceSave(get);
-      return;
+    if (state.activeTabIdByCollection[collectionId] === tabId) {
+      nextState.activeTabIdByCollection[collectionId] = nextOrder[nextOrder.length - 1] ?? "";
     }
 
-    let nextActiveId = state.activeTabId;
-
-    if (state.activeTabId === tabId) {
-      nextActiveId = tabs[tabs.length - 1].id;
-    }
-
-    set({
-      tabs,
-      activeTabId: nextActiveId,
-    });
+    nextState = ensureCollectionHasTab(nextState, collectionId) as WorkspaceStore & WorkspaceUiState;
+    set(nextState);
     scheduleWorkspaceSave(get);
   },
 
   setActiveTab: (tabId) => {
-    set({
-      activeTabId: tabId,
+    const tab = get().tabsById[tabId];
+    if (!tab) return;
+    set((state) => ({
+      activeTabIdByCollection: {
+        ...state.activeTabIdByCollection,
+        [tab.collectionId]: tabId,
+      },
+      currentCollectionId: tab.collectionId,
+    }));
+    scheduleWorkspaceSave(get);
+  },
+
+  setCurrentCollection: (collectionId) => {
+    const current = get();
+    const hasTabs = (current.tabOrderByCollection[collectionId] ?? []).length > 0;
+    if (current.currentCollectionId === collectionId && hasTabs) {
+      return;
+    }
+
+    set((state) => {
+      const ensured = ensureCollectionHasTab(state, collectionId);
+      return {
+        ...ensured,
+        currentCollectionId: collectionId,
+      };
     });
     scheduleWorkspaceSave(get);
   },
@@ -199,18 +352,121 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
   },
 
   updateTab: (tabId, data) => {
-    set((state) => ({
-      tabs: state.tabs.map((tab) =>
-        tab.id === tabId
-          ? {
-              ...tab,
-              ...data,
-              updatedAt: Date.now(),
-            }
-          : tab,
-      ),
+    set((state) => {
+      const current = state.tabsById[tabId];
+      if (!current) {
+        return state;
+      }
+      return {
+        tabsById: {
+          ...state.tabsById,
+          [tabId]: {
+            ...current,
+            ...data,
+            updatedAt: Date.now(),
+          },
+        },
+      };
+    });
+    scheduleWorkspaceSave(get);
+  },
+
+  openSavedRequest: (savedRequest) => {
+    const state = get();
+    const existing = Object.values(state.tabsById).find(
+      (tab) =>
+        tab.collectionId === savedRequest.collectionId &&
+        tab.savedRequestId === savedRequest.id,
+    );
+    if (existing) {
+      set((current) => ({
+        currentCollectionId: savedRequest.collectionId,
+        activeTabIdByCollection: {
+          ...current.activeTabIdByCollection,
+          [savedRequest.collectionId]: existing.id,
+        },
+      }));
+      scheduleWorkspaceSave(get);
+      return;
+    }
+
+    const tab = createWorkspaceTab("http", savedRequest.collectionId);
+    tab.savedRequestId = savedRequest.id;
+    tab.title = savedRequest.name;
+    tab.method = savedRequest.method;
+    tab.url = savedRequest.url;
+    tab.body = savedRequest.body;
+    tab.preRequestScript = savedRequest.preRequestScript;
+    tab.postResponseScript = savedRequest.postResponseScript;
+    tab.headers = savedRequest.headers;
+    tab.queryParams = savedRequest.queryParams;
+    tab.auth = savedRequest.auth;
+    tab.isDirty = false;
+
+    set((current) => ({
+      tabsById: {
+        ...current.tabsById,
+        [tab.id]: tab,
+      },
+      tabOrderByCollection: {
+        ...current.tabOrderByCollection,
+        [savedRequest.collectionId]: [
+          ...(current.tabOrderByCollection[savedRequest.collectionId] ?? []),
+          tab.id,
+        ],
+      },
+      activeTabIdByCollection: {
+        ...current.activeTabIdByCollection,
+        [savedRequest.collectionId]: tab.id,
+      },
+      currentCollectionId: savedRequest.collectionId,
     }));
     scheduleWorkspaceSave(get);
+  },
+
+  saveTabToCollection: async (tabId, options) => {
+    const state = get();
+    const tab = state.tabsById[tabId];
+    if (!tab) return null;
+
+    const payload = await backendClient.collections.saveRequest({
+      id: tab.savedRequestId ?? "",
+      collectionId: options?.collectionId ?? tab.collectionId,
+      folderId: options?.folderId ?? null,
+      name: (options?.name ?? tab.title) || "New Request",
+      method: tab.method,
+      url: tab.url,
+      body: tab.body,
+      preRequestScript: tab.preRequestScript,
+      postResponseScript: tab.postResponseScript,
+      headers: tab.headers,
+      queryParams: tab.queryParams,
+      auth: tab.auth,
+      sortOrder: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    set((current) => {
+      const currentTab = current.tabsById[tabId];
+      if (!currentTab) return current;
+      return {
+        tabsById: {
+          ...current.tabsById,
+          [tabId]: {
+            ...currentTab,
+            collectionId: payload.collectionId,
+            savedRequestId: payload.id,
+            title: payload.name,
+            isDirty: false,
+            updatedAt: Date.now(),
+          },
+        },
+      };
+    });
+    scheduleWorkspaceSave(get);
+
+    return payload;
   },
 
   createEnvironment: () => {

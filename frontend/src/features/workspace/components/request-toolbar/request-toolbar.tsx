@@ -1,4 +1,4 @@
-import { SendHorizonal, Loader2 } from "lucide-react";
+import { SendHorizonal, Loader2, Save } from "lucide-react";
 import type { RequestTab, HttpMethod } from "../../types";
 import { Button } from "@/components";
 import { useSendHttpRequest } from "../../hooks";
@@ -9,10 +9,13 @@ import type { RequestSnapshot } from "../../types/response";
 import {
   useActiveEnvironment,
   useWorkspaceEnvironments,
+  useWorkspaceSaveTabToCollection,
   useWorkspaceSetActiveEnvironment,
   useWorkspaceUpdateTab,
 } from "../../stores";
 import { useWorkspaceStore } from "../../stores/workspace.store";
+import { useCollectionsStore } from "@/features/collections";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { UrlInput } from "./url-input";
 import { MethodSelect } from "./method-select";
 import { EnvironmentSelect } from "./enironment-select";
@@ -39,9 +42,48 @@ export function RequestToolbar({ tab }: Props) {
   const environments = useWorkspaceEnvironments();
   const activeEnvironment = useActiveEnvironment();
   const setActiveEnvironment = useWorkspaceSetActiveEnvironment();
+  const saveTabToCollection = useWorkspaceSaveTabToCollection();
+  const upsertRequest = useCollectionsStore((state) => state.upsertRequest);
   const templateValues = createVariableMap(activeEnvironment?.variables ?? []);
 
   const { mutateAsync: sendHttpRequest, isPending } = useSendHttpRequest();
+
+  const handleSave = async () => {
+    const saved = await saveTabToCollection(tab.id);
+    if (saved) {
+      upsertRequest(saved);
+      updateTab(tab.id, {
+        title: saved.name,
+        isDirty: false,
+      });
+    }
+  };
+
+  useHotkeys(
+    [
+      {
+        id: `save-tab-${tab.id}-meta`,
+        combo: "meta+s",
+        description: "Save request",
+        handler: () => {
+          void handleSave();
+        },
+        preventDefault: true,
+      },
+      {
+        id: `save-tab-${tab.id}-ctrl`,
+        combo: "ctrl+s",
+        description: "Save request",
+        handler: () => {
+          void handleSave();
+        },
+        preventDefault: true,
+      },
+    ],
+    {
+      disableInsideInputs: false,
+    },
+  );
 
   const handleMethodChange = (method: HttpMethod) => {
     updateTab(tab.id, {
@@ -321,6 +363,13 @@ export function RequestToolbar({ tab }: Props) {
         activeEnvironmentId={activeEnvironment?.id}
         onSelect={setActiveEnvironment}
       />
+
+      {(tab.isDirty || !tab.savedRequestId) && (
+        <Button variant="outline" onClick={() => void handleSave()} className="gap-2">
+          <Save className="h-4 w-4" />
+          Save
+        </Button>
+      )}
 
       <Button
         onClick={handleSendRequest}

@@ -1,5 +1,41 @@
 export namespace api {
 	
+	export class CollectionPayload {
+	    id: string;
+	    name: string;
+	    description: string;
+	    sortOrder: number;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.sortOrder = source["sortOrder"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class RequestAuthPayload {
+	    type: string;
+	    bearerToken: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequestAuthPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.bearerToken = source["bearerToken"];
+	    }
+	}
 	export class KeyValuePayload {
 	    id: string;
 	    key: string;
@@ -16,6 +52,164 @@ export namespace api {
 	        this.key = source["key"];
 	        this.value = source["value"];
 	        this.enabled = source["enabled"];
+	    }
+	}
+	export class SavedRequestPayload {
+	    id: string;
+	    collectionId: string;
+	    folderId?: string;
+	    name: string;
+	    method: string;
+	    url: string;
+	    body: string;
+	    preRequestScript: string;
+	    postResponseScript: string;
+	    headers: KeyValuePayload[];
+	    queryParams: KeyValuePayload[];
+	    auth: RequestAuthPayload;
+	    sortOrder: number;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SavedRequestPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.collectionId = source["collectionId"];
+	        this.folderId = source["folderId"];
+	        this.name = source["name"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.body = source["body"];
+	        this.preRequestScript = source["preRequestScript"];
+	        this.postResponseScript = source["postResponseScript"];
+	        this.headers = this.convertValues(source["headers"], KeyValuePayload);
+	        this.queryParams = this.convertValues(source["queryParams"], KeyValuePayload);
+	        this.auth = this.convertValues(source["auth"], RequestAuthPayload);
+	        this.sortOrder = source["sortOrder"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class FolderPayload {
+	    id: string;
+	    collectionId: string;
+	    parentFolderId?: string;
+	    name: string;
+	    sortOrder: number;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FolderPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.collectionId = source["collectionId"];
+	        this.parentFolderId = source["parentFolderId"];
+	        this.name = source["name"];
+	        this.sortOrder = source["sortOrder"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class CollectionTreePayload {
+	    collection: CollectionPayload;
+	    folders: FolderPayload[];
+	    savedRequests: SavedRequestPayload[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionTreePayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], CollectionPayload);
+	        this.folders = this.convertValues(source["folders"], FolderPayload);
+	        this.savedRequests = this.convertValues(source["savedRequests"], SavedRequestPayload);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CreateCollectionInput {
+	    name: string;
+	    description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateCollectionInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	    }
+	}
+	export class CreateFolderInput {
+	    collectionId: string;
+	    parentFolderId?: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateFolderInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collectionId = source["collectionId"];
+	        this.parentFolderId = source["parentFolderId"];
+	        this.name = source["name"];
+	    }
+	}
+	export class DeleteEntityInput {
+	    id: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeleteEntityInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	    }
 	}
 	export class EnvironmentPayload {
@@ -52,6 +246,7 @@ export namespace api {
 		    return a;
 		}
 	}
+	
 	export class HttpRequestPayload {
 	    id: string;
 	    method: string;
@@ -141,22 +336,71 @@ export namespace api {
 		}
 	}
 	
-	export class RequestAuthPayload {
-	    type: string;
-	    bearerToken: string;
+	export class MoveFolderInput {
+	    id: string;
+	    newParentFolderId?: string;
+	    newSortOrder: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new RequestAuthPayload(source);
+	        return new MoveFolderInput(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.bearerToken = source["bearerToken"];
+	        this.id = source["id"];
+	        this.newParentFolderId = source["newParentFolderId"];
+	        this.newSortOrder = source["newSortOrder"];
 	    }
 	}
+	export class MoveSavedRequestInput {
+	    id: string;
+	    newFolderId?: string;
+	    newSortOrder: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MoveSavedRequestInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.newFolderId = source["newFolderId"];
+	        this.newSortOrder = source["newSortOrder"];
+	    }
+	}
+	export class RenameCollectionInput {
+	    id: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenameCollectionInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	    }
+	}
+	export class RenameFolderInput {
+	    id: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenameFolderInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	    }
+	}
+	
 	export class RequestTabPayload {
 	    id: string;
+	    collectionId: string;
+	    savedRequestId?: string;
 	    layout: string;
 	    protocol: string;
 	    title: string;
@@ -179,6 +423,8 @@ export namespace api {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.collectionId = source["collectionId"];
+	        this.savedRequestId = source["savedRequestId"];
 	        this.layout = source["layout"];
 	        this.protocol = source["protocol"];
 	        this.title = source["title"];
@@ -214,9 +460,12 @@ export namespace api {
 		}
 	}
 	
+	
 	export class WorkspaceStatePayload {
 	    tabs: RequestTabPayload[];
-	    activeTabId: string;
+	    tabOrderByCollection: Record<string, Array<string>>;
+	    activeTabIdByCollection: Record<string, string>;
+	    currentCollectionId: string;
 	    environments: EnvironmentPayload[];
 	    activeEnvironmentId: string;
 	
@@ -227,7 +476,9 @@ export namespace api {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tabs = this.convertValues(source["tabs"], RequestTabPayload);
-	        this.activeTabId = source["activeTabId"];
+	        this.tabOrderByCollection = source["tabOrderByCollection"];
+	        this.activeTabIdByCollection = source["activeTabIdByCollection"];
+	        this.currentCollectionId = source["currentCollectionId"];
 	        this.environments = this.convertValues(source["environments"], EnvironmentPayload);
 	        this.activeEnvironmentId = source["activeEnvironmentId"];
 	    }

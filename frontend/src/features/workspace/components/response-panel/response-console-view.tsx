@@ -34,7 +34,7 @@ type SectionProps = {
 
 function ConsoleSection({ title, execution }: SectionProps) {
   return (
-    <section className="rounded-md border border-border bg-background">
+    <section className="rounded-md border border-border bg-background scroll-area">
       <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {title}
       </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import {
+  AppBootstrap,
   HotkeysProvider,
   QueryProvider,
   ThemeProvider,
@@ -13,7 +14,7 @@ import "@fontsource/jetbrains-mono";
 import "react18-json-view/src/style.css";
 import "@/style.css";
 
-import { App, EnvironmentsPage } from "./pages";
+import { App, EnvironmentsPage, RootRedirect } from "./pages";
 
 const container = document.getElementById("root");
 
@@ -25,12 +26,15 @@ root.render(
       <QueryProvider>
         <HotkeysProvider>
           <BrowserRouter>
-            <BaseLayout.AppShell>
-              <Routes>
-                <Route path="/" element={<App />} />
-                <Route path="/environments" element={<EnvironmentsPage />} />
-              </Routes>
-            </BaseLayout.AppShell>
+            <AppBootstrap>
+              <BaseLayout.AppShell>
+                <Routes>
+                  <Route path="/" element={<RootRedirect />} />
+                  <Route path="/collections/:id" element={<App />} />
+                  <Route path="/environments" element={<EnvironmentsPage />} />
+                </Routes>
+              </BaseLayout.AppShell>
+            </AppBootstrap>
           </BrowserRouter>
 
           <Toaster />

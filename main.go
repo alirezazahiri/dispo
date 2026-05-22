@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"dispo/backend/collections"
 	"dispo/backend/httpclient"
 	"dispo/backend/scripting"
 	"embed"
@@ -17,6 +18,7 @@ var assets embed.FS
 func main() {
 	httpService := httpclient.NewHTTPService()
 	scriptService := scripting.NewService()
+	collectionsService := collections.NewService()
 
 	err := wails.Run(&options.App{
 		Title:     "dispo",
@@ -35,10 +37,12 @@ func main() {
 		},
 		OnStartup: func(ctx context.Context) {
 			httpService.Startup(ctx)
+			collectionsService.Startup(ctx)
 		},
 		Bind: []interface{}{
 			httpService,
 			scriptService,
+			collectionsService,
 		},
 	})
 

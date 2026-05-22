@@ -1,0 +1,472 @@
+package collections
+
+import (
+	"crypto/rand"
+	"database/sql"
+	"dispo/backend/api"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+type Repository struct {
+	db *sql.DB
+}
+
+func NewRepository() (*Repository, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve user config dir: %w", err)
+	}
+
+	dbDir := filepath.Join(configDir, "dispo")
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create db directory: %w", err)
+	}
+
+	dbPath := filepath.Join(dbDir, "workspace.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite database: %w", err)
+	}
+
+	repo := &Repository{db: db}
+	if err := repo.initSchema(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+
+	return repo, nil
+}
+
+func (r *Repository) initSchema() error {
+	if _, err := r.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		return fmt.Errorf("enable foreign keys: %w", err)
+	}
+
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS collections (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS folders (
+			id TEXT PRIMARY KEY,
+			collection_id TEXT NOT NULL,
+			parent_folder_id TEXT,
+			name TEXT NOT NULL,
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+			FOREIGN KEY(parent_folder_id) REFERENCES folders(id) ON DELETE CASCADE
+		)`,
+		`CREATE TABLE IF NOT EXISTS saved_requests (
+			id TEXT PRIMARY KEY,
+			collection_id TEXT NOT NULL,
+			folder_id TEXT,
+			name TEXT NOT NULL,
+			method TEXT NOT NULL,
+			url TEXT NOT NULL,
+			body TEXT NOT NULL DEFAULT '',
+			pre_request_script TEXT NOT NULL DEFAULT '',
+			post_response_script TEXT NOT NULL DEFAULT '',
+			auth_type TEXT NOT NULL DEFAULT 'none',
+			bearer_token TEXT NOT NULL DEFAULT '',
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+			FOREIGN KEY(folder_id) REFERENCES folders(id) ON DELETE SET NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS saved_request_headers (
+			id TEXT PRIMARY KEY,
+			saved_request_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			key_name TEXT NOT NULL,
+			value TEXT NOT NULL,
+			enabled INTEGER NOT NULL,
+			FOREIGN KEY(saved_request_id) REFERENCES saved_requests(id) ON DELETE CASCADE
+		)`,
+		`CREATE TABLE IF NOT EXISTS saved_request_query_params (
+			id TEXT PRIMARY KEY,
+			saved_request_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			key_name TEXT NOT NULL,
+			value TEXT NOT NULL,
+			enabled INTEGER NOT NULL,
+			FOREIGN KEY(saved_request_id) REFERENCES saved_requests(id) ON DELETE CASCADE
+		)`,
+	}
+
+	for _, statement := range statements {
+		if _, err := r.db.Exec(statement); err != nil {
+			return fmt.Errorf("apply collections schema statement: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (r *Repository) LoadAllCollections() ([]api.CollectionTreePayload, error) {
+	collections := make([]api.CollectionTreePayload, 0)
+
+	rows, err := r.db.Query(`
+		SELECT id, name, description, sort_order, created_at, updated_at
+		FROM collections
+		ORDER BY sort_order ASC, created_at ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query collections: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tree api.CollectionTreePayload
+		if err := rows.Scan(
+			&tree.Collection.ID,
+			&tree.Collection.Name,
+			&tree.Collection.Description,
+			&tree.Collection.SortOrder,
+			&tree.Collection.CreatedAt,
+			&tree.Collection.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan collection: %w", err)
+		}
+
+		folders, err := r.loadFolders(tree.Collection.ID)
+		if err != nil {
+			return nil, err
+		}
+		requests, err := r.loadSavedRequests(tree.Collection.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		tree.Folders = folders
+		tree.SavedRequests = requests
+		collections = append(collections, tree)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate collections: %w", err)
+	}
+
+	return collections, nil
+}
+
+func (r *Repository) CreateCollection(input api.CreateCollectionInput) (api.CollectionPayload, error) {
+	now := time.Now().UnixMilli()
+	collection := api.CollectionPayload{
+		ID:          newID(),
+		Name:        input.Name,
+		Description: input.Description,
+		SortOrder:   r.nextSortOrder("collections", "1=1"),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	_, err := r.db.Exec(
+		`INSERT INTO collections (id, name, description, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		collection.ID,
+		collection.Name,
+		collection.Description,
+		collection.SortOrder,
+		collection.CreatedAt,
+		collection.UpdatedAt,
+	)
+	if err != nil {
+		return api.CollectionPayload{}, fmt.Errorf("insert collection: %w", err)
+	}
+
+	return collection, nil
+}
+
+func (r *Repository) RenameCollection(input api.RenameCollectionInput) error {
+	_, err := r.db.Exec(
+		`UPDATE collections SET name = ?, updated_at = ? WHERE id = ?`,
+		input.Name,
+		time.Now().UnixMilli(),
+		input.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("rename collection: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeleteCollection(id string) error {
+	if _, err := r.db.Exec(`DELETE FROM collections WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete collection: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) CreateFolder(input api.CreateFolderInput) (api.FolderPayload, error) {
+	now := time.Now().UnixMilli()
+	folder := api.FolderPayload{
+		ID:             newID(),
+		CollectionID:   input.CollectionID,
+		ParentFolderID: input.ParentFolderID,
+		Name:           input.Name,
+		SortOrder:      r.nextSortOrder("folders", "collection_id = ?", input.CollectionID),
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO folders (id, collection_id, parent_folder_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		folder.ID, folder.CollectionID, folder.ParentFolderID, folder.Name, folder.SortOrder, folder.CreatedAt, folder.UpdatedAt,
+	)
+	if err != nil {
+		return api.FolderPayload{}, fmt.Errorf("create folder: %w", err)
+	}
+	return folder, nil
+}
+
+func (r *Repository) RenameFolder(input api.RenameFolderInput) error {
+	_, err := r.db.Exec(`UPDATE folders SET name = ?, updated_at = ? WHERE id = ?`, input.Name, time.Now().UnixMilli(), input.ID)
+	if err != nil {
+		return fmt.Errorf("rename folder: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) MoveFolder(input api.MoveFolderInput) error {
+	_, err := r.db.Exec(
+		`UPDATE folders SET parent_folder_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+		input.NewParentFolderID,
+		input.NewSortOrder,
+		time.Now().UnixMilli(),
+		input.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("move folder: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeleteFolder(id string) error {
+	if _, err := r.db.Exec(`DELETE FROM folders WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete folder: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequestPayload, error) {
+	now := time.Now().UnixMilli()
+	isCreate := payload.ID == ""
+	if isCreate {
+		payload.ID = newID()
+		payload.CreatedAt = now
+		payload.SortOrder = r.nextSortOrder("saved_requests", "collection_id = ?", payload.CollectionID)
+	}
+	payload.UpdatedAt = now
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if isCreate {
+		_, err = tx.Exec(
+			`INSERT INTO saved_requests (id, collection_id, folder_id, name, method, url, body, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			payload.ID, payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body,
+			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
+			payload.SortOrder, payload.CreatedAt, payload.UpdatedAt,
+		)
+	} else {
+		_, err = tx.Exec(
+			`UPDATE saved_requests
+			 SET collection_id = ?, folder_id = ?, name = ?, method = ?, url = ?, body = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = ?, updated_at = ?
+			 WHERE id = ?`,
+			payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body,
+			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
+			payload.SortOrder, payload.UpdatedAt, payload.ID,
+		)
+	}
+	if err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("upsert saved request: %w", err)
+	}
+
+	if _, err = tx.Exec(`DELETE FROM saved_request_headers WHERE saved_request_id = ?`, payload.ID); err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("clear saved request headers: %w", err)
+	}
+	if _, err = tx.Exec(`DELETE FROM saved_request_query_params WHERE saved_request_id = ?`, payload.ID); err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("clear saved request query params: %w", err)
+	}
+
+	for index, header := range payload.Headers {
+		headerID := header.ID
+		if headerID == "" {
+			headerID = newID()
+		}
+		if _, err = tx.Exec(
+			`INSERT INTO saved_request_headers (id, saved_request_id, position, key_name, value, enabled) VALUES (?, ?, ?, ?, ?, ?)`,
+			headerID, payload.ID, index, header.Key, header.Value, boolToInt(header.Enabled),
+		); err != nil {
+			return api.SavedRequestPayload{}, fmt.Errorf("insert saved request header: %w", err)
+		}
+	}
+
+	for index, param := range payload.QueryParams {
+		paramID := param.ID
+		if paramID == "" {
+			paramID = newID()
+		}
+		if _, err = tx.Exec(
+			`INSERT INTO saved_request_query_params (id, saved_request_id, position, key_name, value, enabled) VALUES (?, ?, ?, ?, ?, ?)`,
+			paramID, payload.ID, index, param.Key, param.Value, boolToInt(param.Enabled),
+		); err != nil {
+			return api.SavedRequestPayload{}, fmt.Errorf("insert saved request param: %w", err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("commit save request transaction: %w", err)
+	}
+
+	return payload, nil
+}
+
+func (r *Repository) MoveRequest(input api.MoveSavedRequestInput) error {
+	_, err := r.db.Exec(
+		`UPDATE saved_requests SET folder_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+		input.NewFolderID,
+		input.NewSortOrder,
+		time.Now().UnixMilli(),
+		input.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("move saved request: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeleteRequest(id string) error {
+	if _, err := r.db.Exec(`DELETE FROM saved_requests WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete saved request: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) loadFolders(collectionID string) ([]api.FolderPayload, error) {
+	rows, err := r.db.Query(`
+		SELECT id, collection_id, parent_folder_id, name, sort_order, created_at, updated_at
+		FROM folders
+		WHERE collection_id = ?
+		ORDER BY sort_order ASC, created_at ASC
+	`, collectionID)
+	if err != nil {
+		return nil, fmt.Errorf("query folders: %w", err)
+	}
+	defer rows.Close()
+
+	folders := make([]api.FolderPayload, 0)
+	for rows.Next() {
+		var folder api.FolderPayload
+		if err := rows.Scan(
+			&folder.ID, &folder.CollectionID, &folder.ParentFolderID, &folder.Name,
+			&folder.SortOrder, &folder.CreatedAt, &folder.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan folder: %w", err)
+		}
+		folders = append(folders, folder)
+	}
+	return folders, rows.Err()
+}
+
+func (r *Repository) loadSavedRequests(collectionID string) ([]api.SavedRequestPayload, error) {
+	rows, err := r.db.Query(`
+		SELECT id, collection_id, folder_id, name, method, url, body, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
+		FROM saved_requests
+		WHERE collection_id = ?
+		ORDER BY sort_order ASC, created_at ASC
+	`, collectionID)
+	if err != nil {
+		return nil, fmt.Errorf("query saved requests: %w", err)
+	}
+	defer rows.Close()
+
+	requests := make([]api.SavedRequestPayload, 0)
+	for rows.Next() {
+		var request api.SavedRequestPayload
+		if err := rows.Scan(
+			&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body,
+			&request.PreRequestScript, &request.PostResponseScript, &request.Auth.Type, &request.Auth.BearerToken,
+			&request.SortOrder, &request.CreatedAt, &request.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan saved request: %w", err)
+		}
+		headers, err := r.loadRequestRows("saved_request_headers", request.ID)
+		if err != nil {
+			return nil, err
+		}
+		params, err := r.loadRequestRows("saved_request_query_params", request.ID)
+		if err != nil {
+			return nil, err
+		}
+		request.Headers = headers
+		request.QueryParams = params
+		requests = append(requests, request)
+	}
+	return requests, rows.Err()
+}
+
+func (r *Repository) loadRequestRows(table string, requestID string) ([]api.KeyValuePayload, error) {
+	rows, err := r.db.Query(
+		fmt.Sprintf(`SELECT id, key_name, value, enabled FROM %s WHERE saved_request_id = ? ORDER BY position ASC`, table),
+		requestID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query request rows: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]api.KeyValuePayload, 0)
+	for rows.Next() {
+		var item api.KeyValuePayload
+		var enabled int
+		if err := rows.Scan(&item.ID, &item.Key, &item.Value, &enabled); err != nil {
+			return nil, fmt.Errorf("scan request row: %w", err)
+		}
+		item.Enabled = enabled == 1
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func (r *Repository) nextSortOrder(table string, whereClause string, args ...any) int {
+	query := fmt.Sprintf("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM %s WHERE %s", table, whereClause)
+	var value int
+	if err := r.db.QueryRow(query, args...).Scan(&value); err != nil {
+		return 0
+	}
+	return value
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func newID() string {
+	buffer := make([]byte, 10)
+	if _, err := rand.Read(buffer); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(buffer)
+}

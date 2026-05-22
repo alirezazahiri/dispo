@@ -20,6 +20,8 @@ type EnvironmentPayload struct {
 
 type RequestTabPayload struct {
 	ID                 string             `json:"id"`
+	CollectionID       string             `json:"collectionId"`
+	SavedRequestID     *string            `json:"savedRequestId,omitempty"`
 	Layout             string             `json:"layout"`
 	Protocol           string             `json:"protocol"`
 	Title              string             `json:"title"`
@@ -37,10 +39,12 @@ type RequestTabPayload struct {
 }
 
 type WorkspaceStatePayload struct {
-	Tabs                []RequestTabPayload  `json:"tabs"`
-	ActiveTabID         string               `json:"activeTabId"`
-	Environments        []EnvironmentPayload `json:"environments"`
-	ActiveEnvironmentID string               `json:"activeEnvironmentId"`
+	Tabs                    []RequestTabPayload  `json:"tabs"`
+	TabOrderByCollection    map[string][]string  `json:"tabOrderByCollection"`
+	ActiveTabIDByCollection map[string]string    `json:"activeTabIdByCollection"`
+	CurrentCollectionID     string               `json:"currentCollectionId"`
+	Environments            []EnvironmentPayload `json:"environments"`
+	ActiveEnvironmentID     string               `json:"activeEnvironmentId"`
 }
 
 type HttpRequestPayload struct {

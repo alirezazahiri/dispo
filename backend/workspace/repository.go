@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -15,6 +16,11 @@ import (
 type Repository struct {
 	db *sql.DB
 }
+
+const (
+	defaultCollectionID   = "default-collection"
+	defaultCollectionName = "Workspace"
+)
 
 func NewRepository() (*Repository, error) {
 	configDir, err := os.UserConfigDir()
@@ -55,10 +61,23 @@ func (r *Repository) initSchema() error {
 		`CREATE TABLE IF NOT EXISTS workspace_meta (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
 			active_tab_id TEXT NOT NULL DEFAULT '',
+			tab_order_by_collection_json TEXT NOT NULL DEFAULT '{}',
+			active_tab_by_collection_json TEXT NOT NULL DEFAULT '{}',
+			current_collection_id TEXT NOT NULL DEFAULT '` + defaultCollectionID + `',
 			active_environment_id TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE TABLE IF NOT EXISTS collections (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS request_tabs (
 			id TEXT PRIMARY KEY,
+			collection_id TEXT NOT NULL DEFAULT '` + defaultCollectionID + `',
+			saved_request_id TEXT,
 			layout TEXT NOT NULL,
 			protocol TEXT NOT NULL,
 			title TEXT NOT NULL,
@@ -133,6 +152,68 @@ func (r *Repository) initSchema() error {
 	); err != nil {
 		return err
 	}
+	if err := r.ensureColumnExists(
+		"request_tabs",
+		"collection_id",
+		`ALTER TABLE request_tabs ADD COLUMN collection_id TEXT NOT NULL DEFAULT '`+defaultCollectionID+`'`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"request_tabs",
+		"saved_request_id",
+		`ALTER TABLE request_tabs ADD COLUMN saved_request_id TEXT`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"workspace_meta",
+		"tab_order_by_collection_json",
+		`ALTER TABLE workspace_meta ADD COLUMN tab_order_by_collection_json TEXT NOT NULL DEFAULT '{}'`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"workspace_meta",
+		"active_tab_by_collection_json",
+		`ALTER TABLE workspace_meta ADD COLUMN active_tab_by_collection_json TEXT NOT NULL DEFAULT '{}'`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"workspace_meta",
+		"current_collection_id",
+		`ALTER TABLE workspace_meta ADD COLUMN current_collection_id TEXT NOT NULL DEFAULT '`+defaultCollectionID+`'`,
+	); err != nil {
+		return err
+	}
+	if _, err := r.db.Exec(
+		`UPDATE workspace_meta
+		 SET tab_order_by_collection_json = COALESCE(NULLIF(tab_order_by_collection_json, ''), '{}'),
+		     active_tab_by_collection_json = COALESCE(NULLIF(active_tab_by_collection_json, ''), '{}'),
+		     current_collection_id = COALESCE(NULLIF(current_collection_id, ''), ?)
+		 WHERE id = 1`,
+		defaultCollectionID,
+	); err != nil {
+		return fmt.Errorf("normalize workspace_meta defaults: %w", err)
+	}
+
+	now := time.Now().UnixMilli()
+	if _, err := r.db.Exec(
+		`INSERT OR IGNORE INTO collections (id, name, description, sort_order, created_at, updated_at) VALUES (?, ?, '', 0, ?, ?)`,
+		defaultCollectionID,
+		defaultCollectionName,
+		now,
+		now,
+	); err != nil {
+		return fmt.Errorf("ensure default collection: %w", err)
+	}
+	if _, err := r.db.Exec(
+		`UPDATE request_tabs SET collection_id = ? WHERE collection_id IS NULL OR collection_id = ''`,
+		defaultCollectionID,
+	); err != nil {
+		return fmt.Errorf("assign default collection: %w", err)
+	}
 
 	return nil
 }
@@ -172,9 +253,11 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 
 		if _, err = tx.Exec(
 			`INSERT INTO request_tabs (
-				id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, collection_id, saved_request_id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tab.ID,
+			tab.CollectionID,
+			tab.SavedRequestID,
 			tab.Layout,
 			tab.Protocol,
 			tab.Title,
@@ -246,9 +329,23 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 		}
 	}
 
+	tabOrderByCollectionJSON, marshalErr := json.Marshal(state.TabOrderByCollection)
+	if marshalErr != nil {
+		return fmt.Errorf("marshal tab_order_by_collection_json: %w", marshalErr)
+	}
+	activeTabByCollectionJSON, marshalErr := json.Marshal(state.ActiveTabIDByCollection)
+	if marshalErr != nil {
+		return fmt.Errorf("marshal active_tab_by_collection_json: %w", marshalErr)
+	}
+
 	if _, err = tx.Exec(
-		`UPDATE workspace_meta SET active_tab_id = ?, active_environment_id = ? WHERE id = 1`,
-		state.ActiveTabID,
+		`UPDATE workspace_meta
+		 SET active_tab_id = ?, tab_order_by_collection_json = ?, active_tab_by_collection_json = ?, current_collection_id = ?, active_environment_id = ?
+		 WHERE id = 1`,
+		"",
+		string(tabOrderByCollectionJSON),
+		string(activeTabByCollectionJSON),
+		state.CurrentCollectionID,
 		state.ActiveEnvironmentID,
 	); err != nil {
 		return fmt.Errorf("update workspace meta: %w", err)
@@ -265,15 +362,21 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 	var state api.WorkspaceStatePayload
 
 	var activeTabID string
+	var tabOrderByCollectionJSON string
+	var activeTabByCollectionJSON string
+	var currentCollectionID string
 	var activeEnvironmentID string
-	err := r.db.QueryRow(`SELECT active_tab_id, active_environment_id FROM workspace_meta WHERE id = 1`).
-		Scan(&activeTabID, &activeEnvironmentID)
+	err := r.db.QueryRow(`
+		SELECT active_tab_id, tab_order_by_collection_json, active_tab_by_collection_json, current_collection_id, active_environment_id
+		FROM workspace_meta WHERE id = 1
+	`).Scan(&activeTabID, &tabOrderByCollectionJSON, &activeTabByCollectionJSON, &currentCollectionID, &activeEnvironmentID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return state, fmt.Errorf("read workspace meta: %w", err)
 	}
+	_ = activeTabID
 
 	tabsRows, err := r.db.Query(`
-		SELECT id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+		SELECT id, collection_id, saved_request_id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
 		FROM request_tabs
 		ORDER BY created_at ASC
 	`)
@@ -288,6 +391,8 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 		var responseJSON string
 		if err := tabsRows.Scan(
 			&tab.ID,
+			&tab.CollectionID,
+			&tab.SavedRequestID,
 			&tab.Layout,
 			&tab.Protocol,
 			&tab.Title,
@@ -358,11 +463,29 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 		return state, fmt.Errorf("iterate environments: %w", err)
 	}
 
+	tabOrderByCollection := map[string][]string{}
+	if tabOrderByCollectionJSON != "" {
+		if err := json.Unmarshal([]byte(tabOrderByCollectionJSON), &tabOrderByCollection); err != nil {
+			return state, fmt.Errorf("unmarshal tab_order_by_collection_json: %w", err)
+		}
+	}
+	activeTabByCollection := map[string]string{}
+	if activeTabByCollectionJSON != "" {
+		if err := json.Unmarshal([]byte(activeTabByCollectionJSON), &activeTabByCollection); err != nil {
+			return state, fmt.Errorf("unmarshal active_tab_by_collection_json: %w", err)
+		}
+	}
+	if currentCollectionID == "" {
+		currentCollectionID = defaultCollectionID
+	}
+
 	state = api.WorkspaceStatePayload{
-		Tabs:                tabs,
-		ActiveTabID:         activeTabID,
-		Environments:        environments,
-		ActiveEnvironmentID: activeEnvironmentID,
+		Tabs:                    tabs,
+		TabOrderByCollection:    tabOrderByCollection,
+		ActiveTabIDByCollection: activeTabByCollection,
+		CurrentCollectionID:     currentCollectionID,
+		Environments:            environments,
+		ActiveEnvironmentID:     activeEnvironmentID,
 	}
 
 	return state, nil
