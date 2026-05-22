@@ -9,7 +9,7 @@ export function ResponseEmptyState({ tab }: Props) {
     <div
       className="
           flex h-full flex-col items-center
-          justify-center gap-2
+          justify-center gap-2 scroll-area
           text-muted-foreground
         "
     >

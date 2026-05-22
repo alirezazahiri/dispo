@@ -1,5 +1,6 @@
 import type { WorkspaceState } from "@/features/workspace/types";
 import type { ResponseCookie } from "@/features/workspace/types/response";
+import type { CollectionTree, Collection, Folder, SavedRequest } from "@/features/collections/types";
 
 export type HttpRequestPayload = {
   id: string;
@@ -20,6 +21,10 @@ export type HttpResponsePayload = {
 };
 
 export type WorkspaceStatePayload = WorkspaceState;
+export type CollectionTreePayload = CollectionTree;
+export type CollectionPayload = Collection;
+export type FolderPayload = Folder;
+export type SavedRequestPayload = SavedRequest;
 
 export type ScriptPhase = "pre" | "post";
 

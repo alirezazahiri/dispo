@@ -1,5 +1,4 @@
 import { Globe, Plus, Trash2 } from "lucide-react";
-import { useEffect } from "react";
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components";
 import { KeyValueRowsEditor } from "@/components/shared";
 import {
@@ -8,8 +7,6 @@ import {
   useWorkspaceCreateEnvironment,
   useWorkspaceDeleteEnvironment,
   useWorkspaceEnvironments,
-  useWorkspaceInitialize,
-  useWorkspaceReady,
   useWorkspaceSetActiveEnvironment,
   useWorkspaceUpdateEnvironment,
   useWorkspaceUpdateEnvironmentVariable,
@@ -17,8 +14,6 @@ import {
 } from "@/features/workspace/stores";
 
 export function EnvironmentsPage() {
-  const initialize = useWorkspaceInitialize();
-  const isReady = useWorkspaceReady();
   const environments = useWorkspaceEnvironments();
   const activeEnvironment = useActiveEnvironment();
   const createEnvironment = useWorkspaceCreateEnvironment();
@@ -28,14 +23,6 @@ export function EnvironmentsPage() {
   const addEnvironmentVariable = useWorkspaceAddEnvironmentVariable();
   const updateEnvironmentVariable = useWorkspaceUpdateEnvironmentVariable();
   const removeEnvironmentVariable = useWorkspaceRemoveEnvironmentVariable();
-
-  useEffect(() => {
-    void initialize();
-  }, [initialize]);
-
-  if (!isReady) {
-    return null;
-  }
 
   return (
     <div className="flex min-h-0 h-full flex-col">

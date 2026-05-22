@@ -20,7 +20,7 @@ export function ResponseRequestDetailsView({ tab }: Props) {
     : "No send snapshot yet. Showing current request draft values.";
 
   return (
-    <div className="h-full min-h-0 overflow-auto">
+    <div className="h-full min-h-0 overflow-auto scroll-area">
       <div className="border-b border-border px-4 py-3">
         <div className="text-sm font-medium">Request Details</div>
         <div className="text-xs text-muted-foreground mt-1">

@@ -1,15 +1,29 @@
 import { useWorkspaceStore } from "./workspace.store";
+import { useShallow } from "zustand/react/shallow";
 
 export function useWorkspaceTabs() {
-  return useWorkspaceStore((state) => state.tabs);
+  return useWorkspaceStore(
+    useShallow((state) => {
+      const tabIds = state.tabOrderByCollection[state.currentCollectionId] ?? [];
+      return tabIds
+        .map((tabId) => state.tabsById[tabId])
+        .filter((tab): tab is NonNullable<typeof tab> => Boolean(tab));
+    }),
+  );
 }
 
 export function useWorkspaceReady() {
   return useWorkspaceStore((state) => state.isReady);
 }
 
+export function useActiveCollectionId() {
+  return useWorkspaceStore((state) => state.currentCollectionId);
+}
+
 export function useActiveTabId() {
-  return useWorkspaceStore((state) => state.activeTabId);
+  return useWorkspaceStore(
+    (state) => state.activeTabIdByCollection[state.currentCollectionId],
+  );
 }
 
 export function useWorkspaceLayout() {
@@ -18,14 +32,20 @@ export function useWorkspaceLayout() {
 
 export function useActiveWorkspaceTab() {
   return useWorkspaceStore((state) => {
-    return state.tabs.find((tab) => tab.id === state.activeTabId);
+    const activeTabId = state.activeTabIdByCollection[state.currentCollectionId];
+    return activeTabId ? state.tabsById[activeTabId] : undefined;
+  });
+}
+
+export function useActiveSavedRequestId() {
+  return useWorkspaceStore((state) => {
+    const activeTabId = state.activeTabIdByCollection[state.currentCollectionId];
+    return activeTabId ? state.tabsById[activeTabId]?.savedRequestId ?? null : null;
   });
 }
 
 export function useWorkspaceTab(tabId: string) {
-  return useWorkspaceStore((state) =>
-    state.tabs.find((tab) => tab.id === tabId),
-  );
+  return useWorkspaceStore((state) => state.tabsById[tabId]);
 }
 
 export const useWorkspaceCreateTab = () => useWorkspaceStore((state) => state.createTab);
@@ -38,6 +58,20 @@ export const useWorkspaceSetActiveTab = () =>
   useWorkspaceStore((state) => state.setActiveTab);
 
 export const useWorkspaceSetLayout = () => useWorkspaceStore((state) => state.setLayout);
+export const useWorkspaceSetCurrentCollection = () =>
+  useWorkspaceStore((state) => state.setCurrentCollection);
+export const useWorkspaceOpenSavedRequest = () =>
+  useWorkspaceStore((state) => state.openSavedRequest);
+export const useWorkspaceSaveTabToCollection = () =>
+  useWorkspaceStore((state) => state.saveTabToCollection);
+export const useWorkspaceRemoveCollectionState = () =>
+  useWorkspaceStore((state) => state.removeCollectionState);
+export const useWorkspaceHandleDeletedSavedRequest = () =>
+  useWorkspaceStore((state) => state.handleDeletedSavedRequest);
+export const useWorkspaceHandleRenamedSavedRequest = () =>
+  useWorkspaceStore((state) => state.handleRenamedSavedRequest);
+export const useWorkspaceReconcileCollections = () =>
+  useWorkspaceStore((state) => state.reconcileCollections);
 
 export const useWorkspaceInitialize = () =>
   useWorkspaceStore((state) => state.initialize);

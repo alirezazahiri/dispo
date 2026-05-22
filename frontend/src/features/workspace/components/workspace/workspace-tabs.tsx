@@ -3,27 +3,34 @@ import { Plus } from "lucide-react";
 import { Button, Separator } from "@/components";
 import { DragScrollArea } from "@/components/shared";
 import { useDebouncedCallback } from "@/hooks";
-import { useWorkspaceCreateTab, useWorkspaceTabs } from "../../stores";
+import {
+  useActiveTabId,
+  useWorkspaceCreateTab,
+  useWorkspaceTabs,
+} from "../../stores";
 import { WorkspaceTabItem } from "./workspace-tab-item";
 
 const AUTO_SCROLL_DEBOUNCE_MS = 250;
 
 export function WorkspaceTabs() {
   const tabs = useWorkspaceTabs();
+  const activeTabId = useActiveTabId();
   const createTab = useWorkspaceCreateTab();
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const prevTabCountRef = useRef(tabs.length);
 
-  const scrollLastTabIntoView = useDebouncedCallback(() => {
+  const scrollActiveTabIntoView = useDebouncedCallback(() => {
+    if (!activeTabId) return;
     const container = scrollRef.current;
     if (!container) return;
 
-    const lastChild = container.lastElementChild as HTMLElement | null;
-    if (!lastChild) return;
+    const activeTabElement = container.querySelector<HTMLElement>(
+      `[data-workspace-tab-id="${activeTabId}"]`,
+    );
+    if (!activeTabElement) return;
 
     const containerRect = container.getBoundingClientRect();
-    const childRect = lastChild.getBoundingClientRect();
+    const childRect = activeTabElement.getBoundingClientRect();
 
     const isFullyVisible =
       childRect.left >= containerRect.left &&
@@ -42,11 +49,8 @@ export function WorkspaceTabs() {
   }, AUTO_SCROLL_DEBOUNCE_MS);
 
   useEffect(() => {
-    if (tabs.length > prevTabCountRef.current) {
-      scrollLastTabIntoView();
-    }
-    prevTabCountRef.current = tabs.length;
-  }, [tabs.length, scrollLastTabIntoView]);
+    scrollActiveTabIntoView();
+  }, [activeTabId, tabs.length, scrollActiveTabIntoView]);
 
   return (
     <>

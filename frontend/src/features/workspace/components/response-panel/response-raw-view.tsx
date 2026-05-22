@@ -96,7 +96,7 @@ export function ResponseRawView({ tab }: Props) {
         <pre
           className="
             min-h-full whitespace-pre-wrap
-            break-words
+            break-all
             p-4 font-mono text-xs
             leading-6 text-foreground
           "

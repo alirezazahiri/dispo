@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
-	"dispo/backend/httpclient"
+	"dispo/backend/collections"
+	"dispo/backend/httpservice"
 	"dispo/backend/scripting"
 	"embed"
+	"log"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -15,7 +17,8 @@ import (
 var assets embed.FS
 
 func main() {
-	httpService := httpclient.NewHTTPService()
+	collectionsService := collections.NewService()
+	httpService := httpservice.NewHTTPService()
 	scriptService := scripting.NewService()
 
 	err := wails.Run(&options.App{
@@ -35,10 +38,21 @@ func main() {
 		},
 		OnStartup: func(ctx context.Context) {
 			httpService.Startup(ctx)
+			collectionsService.Startup(ctx)
+		},
+		OnShutdown: func(ctx context.Context) {
+			_ = ctx
+			if err := collectionsService.Close(); err != nil {
+				log.Printf("failed to close collections service: %v", err)
+			}
+			if err := httpService.Close(); err != nil {
+				log.Printf("failed to close http service: %v", err)
+			}
 		},
 		Bind: []interface{}{
 			httpService,
 			scriptService,
+			collectionsService,
 		},
 	})
 

@@ -3,9 +3,12 @@ import { RequestTab, WorkspaceProtocol } from "../types";
 
 export const createWorkspaceTab = (
   protocol: WorkspaceProtocol = "http",
+  collectionId = "default-collection",
 ): RequestTab => {
   return {
     id: nanoid(),
+    collectionId,
+    savedRequestId: null,
 
     layout: "vertical",
 

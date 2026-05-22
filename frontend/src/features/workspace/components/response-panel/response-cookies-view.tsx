@@ -100,7 +100,7 @@ export function ResponseCookiesView({ tab }: Props) {
         columns={columns}
         data={filteredCookies}
         emptyMessage="No cookies found."
-        className="rounded-none border-0"
+        className="rounded-none border-0 scroll-area"
       />
     </div>
   );
