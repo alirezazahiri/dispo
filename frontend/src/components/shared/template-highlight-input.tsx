@@ -1,4 +1,12 @@
-import { useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   HoverCard,
   HoverCardContent,
@@ -17,31 +25,44 @@ type Props = {
 };
 
 const TEMPLATE_REGEX = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
-const TEMPLATE_COLORS = [
+
+type Palette = {
+  text: string;
+  bg: string;
+  cardAccent: string;
+  cardDot: string;
+};
+
+const TEMPLATE_COLORS: Palette[] = [
   {
-    badge: "text-blue-700 dark:text-blue-300",
+    text: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-500/15 dark:bg-blue-400/15",
     cardAccent: "border-blue-500/30",
     cardDot: "bg-blue-400",
   },
   {
-    badge: "text-violet-700 dark:text-violet-300",
+    text: "text-violet-700 dark:text-violet-300",
+    bg: "bg-violet-500/15 dark:bg-violet-400/15",
     cardAccent: "border-violet-500/30",
     cardDot: "bg-violet-400",
   },
   {
-    badge: "text-emerald-700 dark:text-emerald-300",
+    text: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-500/15 dark:bg-emerald-400/15",
     cardAccent: "border-emerald-500/30",
     cardDot: "bg-emerald-400",
   },
   {
-    badge: "text-cyan-700 dark:text-cyan-300",
-    cardAccent: "border-green-500/30",
-    cardDot: "bg-green-400",
+    text: "text-cyan-700 dark:text-cyan-300",
+    bg: "bg-cyan-500/15 dark:bg-cyan-400/15",
+    cardAccent: "border-cyan-500/30",
+    cardDot: "bg-cyan-400",
   },
 ];
 
-const MISSING_TEMPLATE_COLORS = {
-  badge: "text-red-700 dark:text-red-300",
+const MISSING_TEMPLATE_PALETTE: Palette = {
+  text: "text-red-700 dark:text-red-300",
+  bg: "bg-red-500/15 dark:bg-red-400/15",
   cardAccent: "border-red-500/30",
   cardDot: "bg-red-400",
 };
@@ -55,28 +76,113 @@ export function TemplateHighlightInput({
   templateValues = {},
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   const segments = useMemo(() => splitTemplateSegments(value), [value]);
   const hasTemplates = segments.some((segment) => segment.type === "template");
+
+  const syncScroll = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    setScrollLeft(input.scrollLeft);
+  }, []);
+
+  useLayoutEffect(() => {
+    syncScroll();
+  }, [value, syncScroll]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const handleScroll = () => syncScroll();
+    input.addEventListener("scroll", handleScroll, { passive: true });
+    return () => input.removeEventListener("scroll", handleScroll);
+  }, [syncScroll]);
+
+  const setCaretAt = useCallback((position: number) => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    requestAnimationFrame(() => {
+      try {
+        input.setSelectionRange(position, position);
+        setScrollLeft(input.scrollLeft);
+      } catch {
+        // ignore selection errors on unsupported input types
+      }
+    });
+  }, []);
+
+  const selectRange = useCallback((start: number, end: number) => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    requestAnimationFrame(() => {
+      try {
+        input.setSelectionRange(start, end);
+        setScrollLeft(input.scrollLeft);
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
+
+  const handleTokenMouseDown = useCallback(
+    (
+      event: ReactMouseEvent<HTMLSpanElement>,
+      startIndex: number,
+      length: number,
+    ) => {
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      if (rect.width <= 0) {
+        setCaretAt(startIndex + length);
+        return;
+      }
+      const ratio = Math.max(
+        0,
+        Math.min(1, (event.clientX - rect.left) / rect.width),
+      );
+      const charOffset = Math.round(ratio * length);
+      setCaretAt(startIndex + charOffset);
+    },
+    [setCaretAt],
+  );
+
+  const handleTokenDoubleClick = useCallback(
+    (
+      event: ReactMouseEvent<HTMLSpanElement>,
+      startIndex: number,
+      length: number,
+    ) => {
+      event.preventDefault();
+      selectRange(startIndex, startIndex + length);
+    },
+    [selectRange],
+  );
 
   return (
     <div className={cn("relative w-full", className)}>
       {hasTemplates ? (
         <div
+          ref={overlayRef}
           className="
-            absolute inset-0 z-20 flex items-center pointer-events-none
+            pointer-events-none absolute inset-0 z-20 flex items-center
             overflow-hidden rounded-md px-3 py-2
             text-base md:text-sm
           "
           aria-hidden="true"
         >
-          <div className="w-full overflow-hidden whitespace-nowrap">
-            {segments.map((segment, index) => {
+          <div
+            className="w-full whitespace-pre"
+            style={{ transform: `translateX(${-scrollLeft}px)` }}
+          >
+            {segments.map((segment) => {
               if (segment.type === "text") {
                 return (
                   <span
-                    key={`${segment.content}-${index}`}
+                    key={`t-${segment.startIndex}`}
                     className="whitespace-pre text-foreground/80"
                   >
                     {segment.content}
@@ -84,46 +190,51 @@ export function TemplateHighlightInput({
                 );
               }
 
-              const color = TEMPLATE_COLORS[segment.colorIndex];
               const isFound = hasTemplateValue(segment.name, templateValues);
-              const palette = isFound ? color : MISSING_TEMPLATE_COLORS;
+              const palette = isFound
+                ? TEMPLATE_COLORS[segment.colorIndex]
+                : MISSING_TEMPLATE_PALETTE;
 
               const tokenNode = (
                 <span
                   className={cn(
-                    `
-                      pointer-events-auto whitespace-pre
-                      align-baseline
-                    `,
-                    palette.badge,
+                    "pointer-events-auto cursor-text whitespace-pre rounded-sm align-baseline",
+                    "transition-colors",
+                    palette.text,
+                    palette.bg,
                   )}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    inputRef.current?.focus();
-                  }}
+                  onMouseDown={(event) =>
+                    handleTokenMouseDown(
+                      event,
+                      segment.startIndex,
+                      segment.content.length,
+                    )
+                  }
+                  onDoubleClick={(event) =>
+                    handleTokenDoubleClick(
+                      event,
+                      segment.startIndex,
+                      segment.content.length,
+                    )
+                  }
                 >
                   {segment.content}
                 </span>
               );
 
-              if (isEditing) {
-                return <span key={`${segment.content}-${index}`}>{tokenNode}</span>;
-              }
-
               return (
-                <HoverCard key={`${segment.content}-${index}`} openDelay={50} closeDelay={50}>
-                  <HoverCardTrigger asChild>
-                    {tokenNode}
-                  </HoverCardTrigger>
+                <HoverCard
+                  key={`v-${segment.startIndex}`}
+                  openDelay={120}
+                  closeDelay={80}
+                >
+                  <HoverCardTrigger asChild>{tokenNode}</HoverCardTrigger>
 
                   <HoverCardContent
                     align="start"
                     sideOffset={8}
                     className={cn(
-                      `
-                        min-w-[220px] w-auto rounded-md border bg-popover p-2
-                        shadow-lg
-                      `,
+                      "min-w-[220px] w-auto rounded-md border bg-popover p-2 shadow-lg",
                       palette.cardAccent,
                     )}
                   >
@@ -132,17 +243,18 @@ export function TemplateHighlightInput({
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <span
-                        className={cn(
-                          "h-2 w-2 rounded-full",
-                          palette.cardDot,
-                        )}
+                        className={cn("h-2 w-2 rounded-full", palette.cardDot)}
                       />
-                      <code className="font-mono text-foreground">{segment.name}</code>
+                      <code className="font-mono text-foreground">
+                        {segment.name}
+                      </code>
                     </div>
                     <div
                       className={cn(
-                        "mt-1 text-[11px] font-mono",
-                        isFound ? "text-muted-foreground" : "text-red-300",
+                        "mt-1 break-all text-[11px] font-mono",
+                        isFound
+                          ? "text-muted-foreground"
+                          : "text-red-500 dark:text-red-300",
                       )}
                     >
                       {isFound ? templateValues[segment.name] : "not found"}
@@ -158,13 +270,20 @@ export function TemplateHighlightInput({
       <Input
         ref={inputRef}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onFocus={() => setIsEditing(true)}
-        onBlur={() => setIsEditing(false)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setScrollLeft(event.target.scrollLeft);
+        }}
+        onScroll={syncScroll}
+        onKeyUp={syncScroll}
+        onClick={syncScroll}
+        onSelect={syncScroll}
         placeholder={placeholder}
+        spellCheck={false}
+        autoComplete="off"
         className={cn(
           hasTemplates
-            ? "relative z-10 bg-transparent text-transparent caret-foreground selection:bg-primary/20"
+            ? "relative z-10 bg-transparent text-transparent caret-foreground selection:bg-primary/20 selection:text-transparent"
             : "",
         )}
       />
@@ -172,23 +291,23 @@ export function TemplateHighlightInput({
   );
 }
 
-type Segment = {
-  type: "text" | "template";
-  content: string;
-  name: string;
-  colorIndex: number;
-};
+type Segment =
+  | {
+      type: "text";
+      content: string;
+      startIndex: number;
+    }
+  | {
+      type: "template";
+      content: string;
+      name: string;
+      startIndex: number;
+      colorIndex: number;
+    };
 
 function splitTemplateSegments(value: string): Segment[] {
   if (!value) {
-    return [
-      {
-        type: "text",
-        content: "",
-        name: "",
-        colorIndex: 0,
-      },
-    ];
+    return [];
   }
 
   const segments: Segment[] = [];
@@ -201,8 +320,7 @@ function splitTemplateSegments(value: string): Segment[] {
       segments.push({
         type: "text",
         content: value.slice(lastIndex, match.index),
-        name: "",
-        colorIndex: 0,
+        startIndex: lastIndex,
       });
     }
 
@@ -212,6 +330,7 @@ function splitTemplateSegments(value: string): Segment[] {
       type: "template",
       content: match[0],
       name: variableName,
+      startIndex: match.index,
       colorIndex: getColorIndex(variableName),
     });
 
@@ -223,21 +342,11 @@ function splitTemplateSegments(value: string): Segment[] {
     segments.push({
       type: "text",
       content: value.slice(lastIndex),
-      name: "",
-      colorIndex: 0,
+      startIndex: lastIndex,
     });
   }
 
-  return segments.length
-    ? segments
-    : [
-        {
-          type: "text",
-          content: value,
-          name: "",
-          colorIndex: 0,
-        },
-      ];
+  return segments;
 }
 
 function getColorIndex(variableName: string): number {

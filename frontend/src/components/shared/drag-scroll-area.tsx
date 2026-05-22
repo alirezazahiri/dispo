@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 import { useWheelToHorizontalScroll } from "@/hooks/use-wheel-to-horizontal";
@@ -9,96 +9,98 @@ type Props = React.HTMLAttributes<HTMLDivElement> & {
   wheelToHorizontalScroll?: boolean;
 };
 
-export function DragScrollArea({
-  className,
-  children,
-  wheelToHorizontalScroll,
-  ...props
-}: Props) {
-  const ref = useRef<HTMLDivElement>(null);
+export const DragScrollArea = forwardRef<HTMLDivElement, Props>(
+  function DragScrollArea(
+    { className, children, wheelToHorizontalScroll, ...props },
+    forwardedRef,
+  ) {
+    const ref = useRef<HTMLDivElement>(null);
 
-  const isDraggingRef = useRef(false);
+    useImperativeHandle(forwardedRef, () => ref.current as HTMLDivElement, []);
 
-  const startXRef = useRef(0);
+    const isDraggingRef = useRef(false);
 
-  const scrollLeftRef = useRef(0);
+    const startXRef = useRef(0);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = ref.current;
+    const scrollLeftRef = useRef(0);
 
-    if (!el) return;
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+      const el = ref.current;
 
-    isDraggingRef.current = true;
+      if (!el) return;
 
-    startXRef.current = e.pageX;
+      isDraggingRef.current = true;
 
-    scrollLeftRef.current = el.scrollLeft;
+      startXRef.current = e.pageX;
 
-    el.classList.add("cursor-grabbing");
+      scrollLeftRef.current = el.scrollLeft;
 
-    document.body.style.userSelect = "none";
-  };
+      el.classList.add("cursor-grabbing");
 
-  const handleMouseUp = () => {
-    const el = ref.current;
-
-    isDraggingRef.current = false;
-
-    el?.classList.remove("cursor-grabbing");
-
-    document.body.style.userSelect = "";
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = ref.current;
-
-    if (!el || !isDraggingRef.current) {
-      return;
-    }
-
-    const delta = e.pageX - startXRef.current;
-
-    el.scrollLeft = scrollLeftRef.current - delta;
-  };
-
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    const el = ref.current;
-
-    if (!el) return;
-
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-      el.scrollLeft += e.deltaY;
-    }
-  };
-
-  useWheelToHorizontalScroll({ ref, enable: wheelToHorizontalScroll });
-
-  useEffect(() => {
-    window.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = "none";
     };
-  }, []);
 
-  return (
-    <div
-      ref={ref}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onWheel={handleWheel}
-      className={cn(
-        `
+    const handleMouseUp = () => {
+      const el = ref.current;
+
+      isDraggingRef.current = false;
+
+      el?.classList.remove("cursor-grabbing");
+
+      document.body.style.userSelect = "";
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      const el = ref.current;
+
+      if (!el || !isDraggingRef.current) {
+        return;
+      }
+
+      const delta = e.pageX - startXRef.current;
+
+      el.scrollLeft = scrollLeftRef.current - delta;
+    };
+
+    const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+      const el = ref.current;
+
+      if (!el) return;
+
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        el.scrollLeft += e.deltaY;
+      }
+    };
+
+    useWheelToHorizontalScroll({ ref, enable: wheelToHorizontalScroll });
+
+    useEffect(() => {
+      window.addEventListener("mouseup", handleMouseUp);
+
+      return () => {
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
+    }, []);
+
+    return (
+      <div
+        ref={ref}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onWheel={handleWheel}
+        className={cn(
+          `
           cursor-pointer
           overflow-x-auto
           overflow-y-hidden
           select-none
         `,
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-}
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  },
+);

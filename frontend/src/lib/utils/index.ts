@@ -6,4 +6,5 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export * from "./bytes";
+export * from "./debounce";
 export * from "./headers";
