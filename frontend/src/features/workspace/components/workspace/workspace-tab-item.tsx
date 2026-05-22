@@ -5,6 +5,7 @@ import {
   useWorkspaceCloseTab,
   useWorkspaceSetActiveTab,
 } from "@/features/workspace/stores";
+import { MethodBadge } from "@/components/shared";
 
 type Props = {
   tab: RequestTab;
@@ -31,7 +32,7 @@ export function WorkspaceTabItem({ tab }: Props) {
         }
       `}
     >
-      <span className="font-medium">{tab.method}</span>
+      <MethodBadge method={tab.method} />
 
       <span className="max-w-[160px] truncate">{tab.title}</span>
 

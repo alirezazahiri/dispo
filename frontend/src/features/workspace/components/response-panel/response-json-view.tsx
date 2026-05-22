@@ -1,5 +1,6 @@
 import type { RequestTab } from "../../types";
 import JsonView from "react18-json-view";
+import { ResponseEmptyState } from "./response-empty-state";
 
 type Props = {
   tab: RequestTab;
@@ -7,7 +8,7 @@ type Props = {
 
 export function ResponseJsonView({ tab }: Props) {
   if (!tab.response?.body) {
-    return null;
+    return <ResponseEmptyState tab={tab} />;
   }
 
   return (

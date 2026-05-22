@@ -1,14 +1,6 @@
 import { SendHorizonal, Loader2 } from "lucide-react";
-import type { RequestTab, HttpMethod, KeyValuePair } from "../../types";
-import {
-  Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components";
-import { TemplateHighlightInput } from "@/components/shared";
+import type { RequestTab, HttpMethod } from "../../types";
+import { Button } from "@/components";
 import { useSendHttpRequest } from "../../hooks";
 import { toast } from "sonner";
 import { normalizeHeaders } from "@/lib/utils";
@@ -20,12 +12,19 @@ import {
   useWorkspaceSetActiveEnvironment,
   useWorkspaceUpdateTab,
 } from "../../stores";
+import { UrlInput } from "./url-input";
+import { MethodSelect } from "./method-select";
+import { EnvironmentSelect } from "./enironment-select";
+import {
+  createVariableMap,
+  resolveTemplate,
+  appendQueryParams,
+  buildRequestSnapshot,
+} from "./utils";
 
 type Props = {
   tab: RequestTab;
 };
-
-const METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
 export function RequestToolbar({ tab }: Props) {
   const updateTab = useWorkspaceUpdateTab();
@@ -86,7 +85,11 @@ export function RequestToolbar({ tab }: Props) {
           ?.filter((header) => header.enabled && header.key.trim())
           .map((header) => ({
             key: resolveTemplate(header.key, variableMap, unresolvedVariables),
-            value: resolveTemplate(header.value, variableMap, unresolvedVariables),
+            value: resolveTemplate(
+              header.value,
+              variableMap,
+              unresolvedVariables,
+            ),
           })) ?? []
       ).reduce<Record<string, string>>((acc, header) => {
         if (header.key.trim()) {
@@ -250,171 +253,5 @@ export function RequestToolbar({ tab }: Props) {
         )}
       </Button>
     </div>
-  );
-}
-
-type EnvironmentSelectProps = {
-  environments: Array<{ id: string; name: string }>;
-  activeEnvironmentId?: string;
-  onSelect: (environmentId: string) => void;
-};
-
-function EnvironmentSelect({
-  environments,
-  activeEnvironmentId,
-  onSelect,
-}: EnvironmentSelectProps) {
-  return (
-    <div className="flex items-center gap-2 min-w-[180px]">
-      <Select value={activeEnvironmentId} onValueChange={onSelect}>
-        <SelectTrigger>
-          <SelectValue placeholder="Environment" />
-        </SelectTrigger>
-        <SelectContent>
-          {environments.map((environment) => (
-            <SelectItem key={environment.id} value={environment.id}>
-              {environment.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function createVariableMap(variables: KeyValuePair[]) {
-  return variables.reduce<Record<string, string>>((acc, variable) => {
-    const key = variable.key.trim();
-    if (variable.enabled && key) {
-      acc[key] = variable.value;
-    }
-    return acc;
-  }, {});
-}
-
-function resolveTemplate(
-  value: string,
-  variableMap: Record<string, string>,
-  unresolvedVariables: Set<string>,
-) {
-  return value.replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_, variableName: string) => {
-    if (Object.prototype.hasOwnProperty.call(variableMap, variableName)) {
-      return variableMap[variableName];
-    }
-    unresolvedVariables.add(variableName);
-    return `{{${variableName}}}`;
-  });
-}
-
-function appendQueryParams(
-  url: string,
-  params: Array<{ key: string; value: string }>,
-) {
-  if (!params.length) {
-    return url;
-  }
-
-  try {
-    const parsedUrl = new URL(url);
-    params.forEach((param) => {
-      parsedUrl.searchParams.set(param.key, param.value);
-    });
-    return parsedUrl.toString();
-  } catch {
-    const [baseUrl, existingQuery = ""] = url.split("?");
-    const searchParams = new URLSearchParams(existingQuery);
-    params.forEach((param) => {
-      searchParams.set(param.key, param.value);
-    });
-    const query = searchParams.toString();
-    return query ? `${baseUrl}?${query}` : baseUrl;
-  }
-}
-
-function buildRequestSnapshot(input: {
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  body: string;
-  queryParamsCount: number;
-}): RequestSnapshot {
-  const normalizedHeaders = Object.entries(input.headers).reduce<Record<string, string>>(
-    (acc, [key, value]) => {
-      acc[key.toLowerCase()] = value;
-      return acc;
-    },
-    {},
-  );
-
-  const authorization = normalizedHeaders.authorization || "Not set";
-  const userAgent = normalizedHeaders["user-agent"] || "dispo/1.0";
-  const contentType = normalizedHeaders["content-type"] || "Not set";
-  const contentLength = new TextEncoder().encode(input.body || "").length;
-  const host = extractHost(input.url);
-
-  return {
-    method: input.method,
-    url: input.url,
-    host,
-    contentType,
-    contentLength,
-    userAgent,
-    authorization,
-    headersCount: Object.keys(input.headers).length,
-    queryParamsCount: input.queryParamsCount,
-    body: input.body || "",
-  };
-}
-
-function extractHost(url: string) {
-  if (!url) {
-    return "Not set";
-  }
-
-  try {
-    return new URL(url).host;
-  } catch {
-    return "Invalid URL";
-  }
-}
-
-type MethodSelectProps = {
-  value: HttpMethod;
-  onChange: (method: HttpMethod) => void;
-};
-
-function MethodSelect({ value, onChange }: MethodSelectProps) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="max-w-[8rem]">
-        <SelectValue placeholder="Http Method" />
-      </SelectTrigger>
-      <SelectContent>
-        {METHODS.map((method) => (
-          <SelectItem key={method} value={method}>
-            {method}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-type UrlInputProps = {
-  value: string;
-
-  onChange: (value: string) => void;
-  templateValues: Record<string, string>;
-};
-
-function UrlInput({ value, onChange, templateValues }: UrlInputProps) {
-  return (
-    <TemplateHighlightInput
-      value={value}
-      onChange={onChange}
-      placeholder="https://api.example.com/users"
-      className="w-full"
-      templateValues={templateValues}
-    />
   );
 }

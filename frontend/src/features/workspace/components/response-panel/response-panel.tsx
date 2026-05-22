@@ -141,7 +141,7 @@ function ResponseContent({ tab }: Props) {
   const response = tab.response || ({} as ResponseData);
 
   if (response.status === "idle") {
-    return <ResponseEmptyState />;
+    return <ResponseEmptyState tab={tab} />;
   }
 
   if (response.status === "loading") {
@@ -153,7 +153,7 @@ function ResponseContent({ tab }: Props) {
       <div
         className="
           flex h-full items-center justify-center
-          text-sm text-destructive text-center
+          text-sm text-destructive text-center px-2
         "
       >
         {response.error}
