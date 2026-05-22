@@ -1,22 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronRight,
-  FilePlus,
-  Folder,
-  FolderOpen,
-  Globe,
-  MoreHorizontal,
-  Plus,
-  Copy,
-  Pencil,
-  Trash2,
-  ArrowDownToLine,
-  ArrowUpToLine,
-  PencilLine,
-  Eraser,
-  Wrench,
-  Minus,
-} from "lucide-react";
+import { Globe, Plus } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -29,13 +12,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   ScrollArea,
   Separator,
 } from "@/components/ui";
@@ -43,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/stores/sidebar";
 import { SidebarItem } from "./sidebar-item";
 import { useCollectionsData, useCollectionsStore } from "@/features";
+import { CollectionNode } from "@/features/collections";
 import {
   useActiveCollectionId,
   useWorkspaceHandleRenamedSavedRequest,
@@ -51,8 +28,6 @@ import {
   useWorkspaceOpenSavedRequest,
   useWorkspaceRemoveCollectionState,
 } from "@/features/workspace/stores";
-import type { Folder as FolderType, SavedRequest } from "@/features";
-import type { HttpMethod } from "@/features/workspace/types";
 import {
   CreateCollectionDialog,
   CreateFolderDialog,
@@ -77,16 +52,26 @@ export const Sidebar = () => {
     requestsByCollection,
     expandedNodeIds,
   } = useCollectionsData();
-  const toggleNodeExpanded = useCollectionsStore((state) => state.toggleNodeExpanded);
+  const toggleNodeExpanded = useCollectionsStore(
+    (state) => state.toggleNodeExpanded,
+  );
   const setNodeExpanded = useCollectionsStore((state) => state.setNodeExpanded);
-  const createCollection = useCollectionsStore((state) => state.createCollection);
+  const createCollection = useCollectionsStore(
+    (state) => state.createCollection,
+  );
   const createFolder = useCollectionsStore((state) => state.createFolder);
   const createRequest = useCollectionsStore((state) => state.createRequest);
-  const renameCollection = useCollectionsStore((state) => state.renameCollection);
+  const renameCollection = useCollectionsStore(
+    (state) => state.renameCollection,
+  );
   const renameFolder = useCollectionsStore((state) => state.renameFolder);
   const renameRequest = useCollectionsStore((state) => state.renameRequest);
-  const duplicateRequest = useCollectionsStore((state) => state.duplicateRequest);
-  const deleteCollection = useCollectionsStore((state) => state.deleteCollection);
+  const duplicateRequest = useCollectionsStore(
+    (state) => state.duplicateRequest,
+  );
+  const deleteCollection = useCollectionsStore(
+    (state) => state.deleteCollection,
+  );
   const deleteFolder = useCollectionsStore((state) => state.deleteFolder);
   const deleteRequest = useCollectionsStore((state) => state.deleteRequest);
 
@@ -99,9 +84,14 @@ export const Sidebar = () => {
     openSavedRequest(created);
   };
 
-  const [createCollectionDialogOpen, setCreateCollectionDialogOpen] = useState(false);
-  const [createFolderCollectionId, setCreateFolderCollectionId] = useState<string | null>(null);
-  const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(null);
+  const [createCollectionDialogOpen, setCreateCollectionDialogOpen] =
+    useState(false);
+  const [createFolderCollectionId, setCreateFolderCollectionId] = useState<
+    string | null
+  >(null);
+  const [deleteCollectionId, setDeleteCollectionId] = useState<string | null>(
+    null,
+  );
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{
     collectionId: string;
     folderId: string;
@@ -132,14 +122,21 @@ export const Sidebar = () => {
       const requests = Object.values(requestsByCollection[collectionId] ?? {});
       return { collection, folders, requests };
     });
-  }, [collectionOrder, collectionsById, foldersByCollection, requestsByCollection]);
+  }, [
+    collectionOrder,
+    collectionsById,
+    foldersByCollection,
+    requestsByCollection,
+  ]);
 
   useEffect(() => {
     if (!activeSavedRequestId) {
       return;
     }
     for (const tree of collectionTrees) {
-      const request = tree.requests.find((item) => item.id === activeSavedRequestId);
+      const request = tree.requests.find(
+        (item) => item.id === activeSavedRequestId,
+      );
       if (!request) {
         continue;
       }
@@ -210,9 +207,13 @@ export const Sidebar = () => {
                   requests={requests}
                   expanded={Boolean(expandedNodeIds[collection.id])}
                   toggleExpanded={() => toggleNodeExpanded(collection.id)}
-                  onOpenCollection={() => navigate(`/collections/${collection.id}`)}
+                  onOpenCollection={() =>
+                    navigate(`/collections/${collection.id}`)
+                  }
                   activeSavedRequestId={activeSavedRequestId}
-                  onCreateFolder={() => setCreateFolderCollectionId(collection.id)}
+                  onCreateFolder={() =>
+                    setCreateFolderCollectionId(collection.id)
+                  }
                   onCreateRequest={(folderId) =>
                     handleCreateRequest(collection.id, folderId)
                   }
@@ -222,7 +223,9 @@ export const Sidebar = () => {
                       name: collection.name,
                     })
                   }
-                  onDeleteCollection={() => setDeleteCollectionId(collection.id)}
+                  onDeleteCollection={() =>
+                    setDeleteCollectionId(collection.id)
+                  }
                   onRenameFolder={(folder) =>
                     setRenameFolderTarget({
                       collectionId: collection.id,
@@ -238,7 +241,10 @@ export const Sidebar = () => {
                     })
                   }
                   onDuplicateRequest={async (requestId) => {
-                    const duplicated = await duplicateRequest(requestId, collection.id);
+                    const duplicated = await duplicateRequest(
+                      requestId,
+                      collection.id,
+                    );
                     navigate(`/collections/${collection.id}`);
                     openSavedRequest(duplicated);
                   }}
@@ -309,7 +315,11 @@ export const Sidebar = () => {
           if (!renameFolderTarget) {
             return;
           }
-          await renameFolder(renameFolderTarget.id, renameFolderTarget.collectionId, name);
+          await renameFolder(
+            renameFolderTarget.id,
+            renameFolderTarget.collectionId,
+            name,
+          );
           setRenameFolderTarget(null);
         }}
       />
@@ -324,18 +334,26 @@ export const Sidebar = () => {
           if (!renameRequestTarget) {
             return;
           }
-          await renameRequest(renameRequestTarget.id, renameRequestTarget.collectionId, name);
+          await renameRequest(
+            renameRequestTarget.id,
+            renameRequestTarget.collectionId,
+            name,
+          );
           handleRenamedSavedRequest(renameRequestTarget.id, name);
           setRenameRequestTarget(null);
         }}
       />
 
-      <AlertDialog open={Boolean(deleteCollectionId)} onOpenChange={() => setDeleteCollectionId(null)}>
+      <AlertDialog
+        open={Boolean(deleteCollectionId)}
+        onOpenChange={() => setDeleteCollectionId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete collection?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the collection, its folders, and all saved requests.
+              This permanently removes the collection, its folders, and all
+              saved requests.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -346,7 +364,8 @@ export const Sidebar = () => {
                 await deleteCollection(deleteCollectionId);
                 removeCollectionState(deleteCollectionId);
                 if (params.id === deleteCollectionId) {
-                  const nextCollectionId = useCollectionsStore.getState().collectionOrder[0];
+                  const nextCollectionId =
+                    useCollectionsStore.getState().collectionOrder[0];
                   if (nextCollectionId) {
                     navigate(`/collections/${nextCollectionId}`);
                   } else {
@@ -361,12 +380,16 @@ export const Sidebar = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={Boolean(deleteFolderTarget)} onOpenChange={() => setDeleteFolderTarget(null)}>
+      <AlertDialog
+        open={Boolean(deleteFolderTarget)}
+        onOpenChange={() => setDeleteFolderTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete folder?</AlertDialogTitle>
             <AlertDialogDescription>
-              Requests in this folder will stay saved and be moved to the collection root.
+              Requests in this folder will stay saved and be moved to the
+              collection root.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -376,7 +399,10 @@ export const Sidebar = () => {
                 if (!deleteFolderTarget) {
                   return;
                 }
-                await deleteFolder(deleteFolderTarget.folderId, deleteFolderTarget.collectionId);
+                await deleteFolder(
+                  deleteFolderTarget.folderId,
+                  deleteFolderTarget.collectionId,
+                );
                 setDeleteFolderTarget(null);
               }}
             >
@@ -385,7 +411,10 @@ export const Sidebar = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AlertDialog open={Boolean(deleteRequestTarget)} onOpenChange={() => setDeleteRequestTarget(null)}>
+      <AlertDialog
+        open={Boolean(deleteRequestTarget)}
+        onOpenChange={() => setDeleteRequestTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete request?</AlertDialogTitle>
@@ -400,8 +429,14 @@ export const Sidebar = () => {
                 if (!deleteRequestTarget) {
                   return;
                 }
-                await deleteRequest(deleteRequestTarget.requestId, deleteRequestTarget.collectionId);
-                handleDeletedSavedRequest(deleteRequestTarget.collectionId, deleteRequestTarget.requestId);
+                await deleteRequest(
+                  deleteRequestTarget.requestId,
+                  deleteRequestTarget.collectionId,
+                );
+                handleDeletedSavedRequest(
+                  deleteRequestTarget.collectionId,
+                  deleteRequestTarget.requestId,
+                );
                 setDeleteRequestTarget(null);
               }}
             >
@@ -413,333 +448,3 @@ export const Sidebar = () => {
     </aside>
   );
 };
-
-type CollectionNodeProps = {
-  collectionId: string;
-  collectionName: string;
-  isActive: boolean;
-  folders: FolderType[];
-  requests: SavedRequest[];
-  expanded: boolean;
-  activeSavedRequestId: string | null;
-  toggleExpanded: () => void;
-  onOpenCollection: () => void;
-  onCreateFolder: () => void;
-  onCreateRequest: (folderId: string | null) => void;
-  onRenameCollection: () => void;
-  onDeleteCollection: () => void;
-  onRenameFolder: (folder: FolderType) => void;
-  onRenameRequest: (request: SavedRequest) => void;
-  onDuplicateRequest: (requestId: string) => Promise<void>;
-  onOpenRequest: (request: SavedRequest) => void;
-  onDeleteFolder: (folderId: string) => void;
-  onDeleteRequest: (requestId: string) => void;
-  expandedNodeIds: Record<string, boolean>;
-  toggleNodeExpanded: (id: string) => void;
-};
-
-function CollectionNode({
-  collectionName,
-  isActive,
-  folders,
-  requests,
-  expanded,
-  activeSavedRequestId,
-  toggleExpanded,
-  onOpenCollection,
-  onCreateFolder,
-  onCreateRequest,
-  onRenameCollection,
-  onDeleteCollection,
-  onRenameFolder,
-  onRenameRequest,
-  onDuplicateRequest,
-  onOpenRequest,
-  onDeleteFolder,
-  onDeleteRequest,
-  expandedNodeIds,
-  toggleNodeExpanded,
-}: CollectionNodeProps) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const rootFolders = folders
-    .filter((folder) => !folder.parentFolderId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-  const rootRequests = requests
-    .filter((request) => !request.folderId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  return (
-    <Collapsible open={expanded} onOpenChange={toggleExpanded}>
-      <div
-        onContextMenu={(event) => {
-          event.preventDefault();
-          setActionsOpen(true);
-        }}
-        className={cn(
-          "group flex w-full items-center gap-1 rounded-md px-1 py-1.5",
-          isActive
-            ? "bg-accent text-foreground"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground",
-        )}
-      >
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-90")} />
-          </Button>
-        </CollapsibleTrigger>
-        <button
-          className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left text-sm"
-          onClick={onOpenCollection}
-        >
-          {expanded ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
-          <span className="min-w-0 flex-1 truncate">{collectionName}</span>
-        </button>
-        <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-              aria-label="Collection actions"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onCreateRequest(null)}>
-              <FilePlus className="mr-2 h-4 w-4" />
-              New Request
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onCreateFolder}>
-              <Folder className="mr-2 h-4 w-4" />
-              New Folder
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onRenameCollection}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={onDeleteCollection}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <CollapsibleContent className="mt-1 space-y-1 pl-4">
-        {rootFolders.map((folder) => (
-          <FolderNode
-            key={folder.id}
-            folder={folder}
-            requests={requests}
-            expandedNodeIds={expandedNodeIds}
-            toggleNodeExpanded={toggleNodeExpanded}
-            onCreateRequest={onCreateRequest}
-            onRenameFolder={onRenameFolder}
-            onRenameRequest={onRenameRequest}
-            onDuplicateRequest={onDuplicateRequest}
-            onOpenRequest={onOpenRequest}
-            onDeleteFolder={onDeleteFolder}
-            onDeleteRequest={onDeleteRequest}
-            activeSavedRequestId={activeSavedRequestId}
-          />
-        ))}
-        {rootRequests.map((request) => (
-          <RequestNode
-            key={request.id}
-            request={request}
-            onRenameRequest={onRenameRequest}
-            onDuplicateRequest={onDuplicateRequest}
-            onOpenRequest={onOpenRequest}
-            onDeleteRequest={onDeleteRequest}
-            isActive={activeSavedRequestId === request.id}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-type FolderNodeProps = {
-  folder: FolderType;
-  requests: SavedRequest[];
-  expandedNodeIds: Record<string, boolean>;
-  toggleNodeExpanded: (id: string) => void;
-  onCreateRequest: (folderId: string | null) => void;
-  onRenameFolder: (folder: FolderType) => void;
-  onRenameRequest: (request: SavedRequest) => void;
-  onDuplicateRequest: (requestId: string) => Promise<void>;
-  onOpenRequest: (request: SavedRequest) => void;
-  onDeleteFolder: (folderId: string) => void;
-  onDeleteRequest: (requestId: string) => void;
-  activeSavedRequestId: string | null;
-};
-
-function FolderNode({
-  folder,
-  requests,
-  expandedNodeIds,
-  toggleNodeExpanded,
-  onCreateRequest,
-  onRenameFolder,
-  onRenameRequest,
-  onDuplicateRequest,
-  onOpenRequest,
-  onDeleteFolder,
-  onDeleteRequest,
-  activeSavedRequestId,
-}: FolderNodeProps) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const expanded = Boolean(expandedNodeIds[folder.id]);
-  const childrenRequests = requests
-    .filter((request) => request.folderId === folder.id)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
-  return (
-    <Collapsible open={expanded} onOpenChange={() => toggleNodeExpanded(folder.id)}>
-      <div
-        onContextMenu={(event) => {
-          event.preventDefault();
-          setActionsOpen(true);
-        }}
-        className="group flex w-full items-center gap-1 rounded-md px-1 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-      >
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-90")} />
-          </Button>
-        </CollapsibleTrigger>
-        <button
-          className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left text-sm"
-          onClick={() => toggleNodeExpanded(folder.id)}
-        >
-          {expanded ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
-          <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-        </button>
-        <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-              aria-label="Folder actions"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onCreateRequest(folder.id)}>
-              <FilePlus className="mr-2 h-4 w-4" />
-              New Request
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onRenameFolder(folder)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive" onClick={() => onDeleteFolder(folder.id)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <CollapsibleContent className="mt-1 space-y-1 pl-4">
-        {childrenRequests.map((request) => (
-          <RequestNode
-            key={request.id}
-            request={request}
-            onRenameRequest={onRenameRequest}
-            onDuplicateRequest={onDuplicateRequest}
-            onOpenRequest={onOpenRequest}
-            onDeleteRequest={onDeleteRequest}
-            isActive={activeSavedRequestId === request.id}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-type RequestNodeProps = {
-  request: SavedRequest;
-  onRenameRequest: (request: SavedRequest) => void;
-  onDuplicateRequest: (requestId: string) => Promise<void>;
-  onOpenRequest: (request: SavedRequest) => void;
-  onDeleteRequest: (requestId: string) => void;
-  isActive: boolean;
-};
-
-function RequestNode({
-  request,
-  onRenameRequest,
-  onDuplicateRequest,
-  onOpenRequest,
-  onDeleteRequest,
-  isActive,
-}: RequestNodeProps) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  return (
-    <div
-      onContextMenu={(event) => {
-        event.preventDefault();
-        setActionsOpen(true);
-      }}
-      className={cn(
-        "group flex w-full items-center gap-1 rounded-md px-1 py-1 text-muted-foreground hover:bg-accent hover:text-foreground",
-        isActive && "bg-accent text-foreground",
-      )}
-    >
-      <button
-        className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left text-sm"
-        onClick={() => onOpenRequest(request)}
-      >
-        <RequestMethodIcon method={request.method as HttpMethod} />
-        <span className="min-w-0 flex-1 truncate">{request.name}</span>
-      </button>
-      <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            aria-label="Request actions"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onRenameRequest(request)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void onDuplicateRequest(request.id)}>
-            <Copy className="mr-2 h-4 w-4" />
-            Duplicate
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive" onClick={() => onDeleteRequest(request.id)}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
-function RequestMethodIcon({ method }: { method: HttpMethod }) {
-  switch (method) {
-    case "GET":
-      return <ArrowDownToLine className="h-4 w-4 shrink-0 text-blue-500" />;
-    case "POST":
-      return <ArrowUpToLine className="h-4 w-4 shrink-0 text-green-500" />;
-    case "PUT":
-      return <PencilLine className="h-4 w-4 shrink-0 text-amber-500" />;
-    case "PATCH":
-      return <Wrench className="h-4 w-4 shrink-0 text-purple-500" />;
-    case "DELETE":
-      return <Eraser className="h-4 w-4 shrink-0 text-red-500" />;
-    case "HEAD":
-    case "OPTIONS":
-    default:
-      return <Minus className="h-4 w-4 shrink-0 text-muted-foreground" />;
-  }
-}
