@@ -1,4 +1,5 @@
 import { useCollectionsStore } from "./collections.store";
+import { useShallow } from "zustand/react/shallow";
 import type { Folder, SavedRequest } from "../types";
 
 export const useCollectionsReady = () =>
@@ -8,13 +9,15 @@ export const useCollectionsInitialize = () =>
   useCollectionsStore((state) => state.initialize);
 
 export const useCollectionsData = () =>
-  useCollectionsStore((state) => ({
-    collectionsById: state.collectionsById,
-    collectionOrder: state.collectionOrder,
-    foldersByCollection: state.foldersByCollection,
-    requestsByCollection: state.requestsByCollection,
-    expandedNodeIds: state.expandedNodeIds,
-  }));
+  useCollectionsStore(
+    useShallow((state) => ({
+      collectionsById: state.collectionsById,
+      collectionOrder: state.collectionOrder,
+      foldersByCollection: state.foldersByCollection,
+      requestsByCollection: state.requestsByCollection,
+      expandedNodeIds: state.expandedNodeIds,
+    })),
+  );
 
 export function useCollectionFolders(collectionId: string): Folder[] {
   return useCollectionsStore((state) =>

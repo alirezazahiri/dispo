@@ -3,6 +3,8 @@
 import {api} from '../models';
 import {context} from '../models';
 
+export function Close():Promise<void>;
+
 export function CreateCollection(arg1:api.CreateCollectionInput):Promise<api.CollectionPayload>;
 
 export function CreateFolder(arg1:api.CreateFolderInput):Promise<api.FolderPayload>;
@@ -13,6 +15,8 @@ export function DeleteFolder(arg1:api.DeleteEntityInput):Promise<void>;
 
 export function DeleteRequest(arg1:api.DeleteEntityInput):Promise<void>;
 
+export function DuplicateRequest(arg1:api.DeleteEntityInput):Promise<api.SavedRequestPayload>;
+
 export function LoadAllCollections():Promise<Array<api.CollectionTreePayload>>;
 
 export function MoveFolder(arg1:api.MoveFolderInput):Promise<void>;
@@ -22,6 +26,8 @@ export function MoveRequest(arg1:api.MoveSavedRequestInput):Promise<void>;
 export function RenameCollection(arg1:api.RenameCollectionInput):Promise<void>;
 
 export function RenameFolder(arg1:api.RenameFolderInput):Promise<void>;
+
+export function RenameRequest(arg1:api.RenameRequestInput):Promise<void>;
 
 export function SaveRequest(arg1:api.SavedRequestPayload):Promise<api.SavedRequestPayload>;
 

@@ -16,6 +16,10 @@ export function useWorkspaceReady() {
   return useWorkspaceStore((state) => state.isReady);
 }
 
+export function useActiveCollectionId() {
+  return useWorkspaceStore((state) => state.currentCollectionId);
+}
+
 export function useActiveTabId() {
   return useWorkspaceStore(
     (state) => state.activeTabIdByCollection[state.currentCollectionId],
@@ -30,6 +34,13 @@ export function useActiveWorkspaceTab() {
   return useWorkspaceStore((state) => {
     const activeTabId = state.activeTabIdByCollection[state.currentCollectionId];
     return activeTabId ? state.tabsById[activeTabId] : undefined;
+  });
+}
+
+export function useActiveSavedRequestId() {
+  return useWorkspaceStore((state) => {
+    const activeTabId = state.activeTabIdByCollection[state.currentCollectionId];
+    return activeTabId ? state.tabsById[activeTabId]?.savedRequestId ?? null : null;
   });
 }
 
@@ -53,6 +64,14 @@ export const useWorkspaceOpenSavedRequest = () =>
   useWorkspaceStore((state) => state.openSavedRequest);
 export const useWorkspaceSaveTabToCollection = () =>
   useWorkspaceStore((state) => state.saveTabToCollection);
+export const useWorkspaceRemoveCollectionState = () =>
+  useWorkspaceStore((state) => state.removeCollectionState);
+export const useWorkspaceHandleDeletedSavedRequest = () =>
+  useWorkspaceStore((state) => state.handleDeletedSavedRequest);
+export const useWorkspaceHandleRenamedSavedRequest = () =>
+  useWorkspaceStore((state) => state.handleRenamedSavedRequest);
+export const useWorkspaceReconcileCollections = () =>
+  useWorkspaceStore((state) => state.reconcileCollections);
 
 export const useWorkspaceInitialize = () =>
   useWorkspaceStore((state) => state.initialize);

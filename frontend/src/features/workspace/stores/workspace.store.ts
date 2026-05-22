@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 
 import { backendClient } from "@/lib/backend/client";
 import type { SavedRequest } from "@/features/collections/types";
+import { useCollectionsStore } from "@/features/collections/stores/collections.store";
 import type {
   Environment,
   KeyValuePair,
@@ -11,8 +12,6 @@ import type {
   WorkspaceState,
 } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
-
-const DEFAULT_COLLECTION_ID = "default-collection";
 
 type WorkspaceLayout = "vertical" | "horizontal";
 
@@ -41,6 +40,10 @@ type WorkspaceStore = {
     tabId: string,
     options?: { name?: string; folderId?: string | null; collectionId?: string },
   ) => Promise<SavedRequest | null>;
+  removeCollectionState: (collectionId: string) => void;
+  handleDeletedSavedRequest: (collectionId: string, requestId: string) => void;
+  handleRenamedSavedRequest: (requestId: string, name: string) => void;
+  reconcileCollections: (collectionIds: string[]) => void;
 
   createEnvironment: () => void;
   setActiveEnvironment: (environmentId: string) => void;
@@ -104,7 +107,10 @@ function reconcileTabOrder(
   const placedIds = new Set(Object.values(result).flat());
   for (const tab of sourceTabs) {
     if (placedIds.has(tab.id)) continue;
-    const collectionId = tab.collectionId || DEFAULT_COLLECTION_ID;
+    const collectionId = tab.collectionId || "";
+    if (!collectionId) {
+      continue;
+    }
     if (!result[collectionId]) {
       result[collectionId] = [];
     }
@@ -116,13 +122,11 @@ function reconcileTabOrder(
 
 function sanitizeState(state: Partial<WorkspaceState> | null | undefined): WorkspaceState {
   const incomingTabs = state?.tabs ?? [];
-  const sourceTabs = incomingTabs.length
-    ? incomingTabs.map((tab) => ({
-        ...tab,
-        collectionId: tab.collectionId || DEFAULT_COLLECTION_ID,
-        savedRequestId: tab.savedRequestId ?? null,
-      }))
-    : [createWorkspaceTab("http", DEFAULT_COLLECTION_ID)];
+  const sourceTabs = incomingTabs.map((tab) => ({
+    ...tab,
+    collectionId: tab.collectionId || "",
+    savedRequestId: tab.savedRequestId ?? null,
+  }));
 
   const tabOrderByCollection = reconcileTabOrder(
     sourceTabs,
@@ -138,7 +142,7 @@ function sanitizeState(state: Partial<WorkspaceState> | null | undefined): Works
   const currentCollectionId =
     state?.currentCollectionId && collectionIds.includes(state.currentCollectionId)
       ? state.currentCollectionId
-      : collectionIds[0] ?? DEFAULT_COLLECTION_ID;
+      : collectionIds[0] ?? "";
 
   const environments = state?.environments?.length
     ? state.environments
@@ -218,17 +222,31 @@ function ensureCollectionHasTab(
   };
 }
 
-const initialTab = createWorkspaceTab("http", DEFAULT_COLLECTION_ID);
+function getFallbackCollectionId(
+  preferred: string,
+  collectionIds: string[],
+  tabOrderByCollection: Record<string, string[]>,
+): string {
+  if (collectionIds.includes(preferred)) {
+    return preferred;
+  }
+  const fromTabs = Object.keys(tabOrderByCollection).find((id) => collectionIds.includes(id));
+  if (fromTabs) {
+    return fromTabs;
+  }
+  return collectionIds[0] ?? "";
+}
+
 const initialEnvironment = createDefaultEnvironment();
 
 export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((set, get) => ({
   layout: "vertical",
   isReady: false,
 
-  tabsById: { [initialTab.id]: initialTab },
-  tabOrderByCollection: { [DEFAULT_COLLECTION_ID]: [initialTab.id] },
-  activeTabIdByCollection: { [DEFAULT_COLLECTION_ID]: initialTab.id },
-  currentCollectionId: DEFAULT_COLLECTION_ID,
+  tabsById: {},
+  tabOrderByCollection: {},
+  activeTabIdByCollection: {},
+  currentCollectionId: "",
   environments: [initialEnvironment],
   activeEnvironmentId: initialEnvironment.id,
 
@@ -265,7 +283,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
   },
 
   createTab: (protocol = "http", collectionId) => {
-    const targetCollectionId = collectionId ?? get().currentCollectionId ?? DEFAULT_COLLECTION_ID;
+    const targetCollectionId = collectionId ?? get().currentCollectionId;
+    if (!targetCollectionId) {
+      return;
+    }
     const tab = createWorkspaceTab(protocol, targetCollectionId);
     set((state) => ({
       tabsById: {
@@ -442,7 +463,15 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
       headers: tab.headers,
       queryParams: tab.queryParams,
       auth: tab.auth,
-      sortOrder: 0,
+      sortOrder: (() => {
+        if (!tab.savedRequestId) {
+          return 0;
+        }
+        const targetCollectionId = options?.collectionId ?? tab.collectionId;
+        const existingRequest =
+          useCollectionsStore.getState().requestsByCollection[targetCollectionId]?.[tab.savedRequestId];
+        return existingRequest?.sortOrder ?? -1;
+      })(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -467,6 +496,193 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()((se
     scheduleWorkspaceSave(get);
 
     return payload;
+  },
+
+  removeCollectionState: (collectionId) => {
+    set((state) => {
+      const nextTabsById = { ...state.tabsById };
+      const tabIdsToRemove = new Set(state.tabOrderByCollection[collectionId] ?? []);
+      for (const [tabId, tab] of Object.entries(state.tabsById)) {
+        if (tab.collectionId === collectionId) {
+          tabIdsToRemove.add(tabId);
+        }
+      }
+      for (const tabId of tabIdsToRemove) {
+        delete nextTabsById[tabId];
+      }
+
+      const nextTabOrderByCollection = { ...state.tabOrderByCollection };
+      delete nextTabOrderByCollection[collectionId];
+      for (const [id, tabIds] of Object.entries(nextTabOrderByCollection)) {
+        nextTabOrderByCollection[id] = tabIds.filter((tabId) => !tabIdsToRemove.has(tabId));
+      }
+
+      const nextActiveTabByCollection = { ...state.activeTabIdByCollection };
+      delete nextActiveTabByCollection[collectionId];
+      for (const [id, tabId] of Object.entries(nextActiveTabByCollection)) {
+        if (tabIdsToRemove.has(tabId)) {
+          delete nextActiveTabByCollection[id];
+        }
+      }
+
+      const remainingCollectionIds = Object.keys(nextTabOrderByCollection);
+      const nextCurrentCollectionId = remainingCollectionIds.includes(state.currentCollectionId)
+        ? state.currentCollectionId
+        : remainingCollectionIds[0] ?? state.currentCollectionId;
+
+      return {
+        tabsById: nextTabsById,
+        tabOrderByCollection: nextTabOrderByCollection,
+        activeTabIdByCollection: nextActiveTabByCollection,
+        currentCollectionId: nextCurrentCollectionId,
+      };
+    });
+    scheduleWorkspaceSave(get);
+  },
+
+  handleDeletedSavedRequest: (collectionId, requestId) => {
+    set((state) => {
+      const nextTabsById = { ...state.tabsById };
+      const nextTabOrderByCollection = { ...state.tabOrderByCollection };
+      const nextActiveTabByCollection = { ...state.activeTabIdByCollection };
+      const tabIds = nextTabOrderByCollection[collectionId] ?? [];
+
+      for (const tabId of tabIds) {
+        const tab = nextTabsById[tabId];
+        if (!tab || tab.savedRequestId !== requestId) {
+          continue;
+        }
+
+        if (tab.isDirty) {
+          nextTabsById[tabId] = {
+            ...tab,
+            savedRequestId: null,
+          };
+          continue;
+        }
+
+        delete nextTabsById[tabId];
+        nextTabOrderByCollection[collectionId] = (nextTabOrderByCollection[collectionId] ?? []).filter(
+          (id) => id !== tabId,
+        );
+        if (nextActiveTabByCollection[collectionId] === tabId) {
+          nextActiveTabByCollection[collectionId] =
+            nextTabOrderByCollection[collectionId]?.[nextTabOrderByCollection[collectionId].length - 1] ?? "";
+        }
+      }
+
+      const nextState = ensureCollectionHasTab(
+        {
+          ...state,
+          tabsById: nextTabsById,
+          tabOrderByCollection: nextTabOrderByCollection,
+          activeTabIdByCollection: nextActiveTabByCollection,
+        } as WorkspaceStore & WorkspaceUiState,
+        collectionId,
+      );
+
+      return {
+        tabsById: nextState.tabsById,
+        tabOrderByCollection: nextState.tabOrderByCollection,
+        activeTabIdByCollection: nextState.activeTabIdByCollection,
+      };
+    });
+    scheduleWorkspaceSave(get);
+  },
+
+  handleRenamedSavedRequest: (requestId, name) => {
+    set((state) => {
+      let changed = false;
+      const nextTabsById: Record<string, RequestTab> = {};
+      for (const [tabId, tab] of Object.entries(state.tabsById)) {
+        if (tab.savedRequestId === requestId && tab.title !== name) {
+          changed = true;
+          nextTabsById[tabId] = {
+            ...tab,
+            title: name,
+            updatedAt: Date.now(),
+          };
+          continue;
+        }
+        nextTabsById[tabId] = tab;
+      }
+
+      if (!changed) {
+        return state;
+      }
+
+      return {
+        tabsById: nextTabsById,
+      };
+    });
+    scheduleWorkspaceSave(get);
+  },
+
+  reconcileCollections: (collectionIds) => {
+    set((state) => {
+      const valid = new Set(collectionIds);
+      const nextTabsById: Record<string, RequestTab> = {};
+      for (const [id, tab] of Object.entries(state.tabsById)) {
+        if (valid.has(tab.collectionId)) {
+          nextTabsById[id] = tab;
+        }
+      }
+
+      const nextTabOrderByCollection: Record<string, string[]> = {};
+      for (const [collectionId, tabIds] of Object.entries(state.tabOrderByCollection)) {
+        if (!valid.has(collectionId)) {
+          continue;
+        }
+        const filtered = tabIds.filter((tabId) => Boolean(nextTabsById[tabId]));
+        if (filtered.length > 0) {
+          nextTabOrderByCollection[collectionId] = filtered;
+        }
+      }
+
+      const nextActiveTabByCollection: Record<string, string> = {};
+      for (const [collectionId, tabId] of Object.entries(state.activeTabIdByCollection)) {
+        if (!valid.has(collectionId)) {
+          continue;
+        }
+        if (tabId && nextTabsById[tabId]) {
+          nextActiveTabByCollection[collectionId] = tabId;
+        }
+      }
+
+      const nextCurrentCollectionId = getFallbackCollectionId(
+        state.currentCollectionId,
+        collectionIds,
+        nextTabOrderByCollection,
+      );
+
+      if (collectionIds.length > 0) {
+        const ensured = ensureCollectionHasTab(
+          {
+            ...state,
+            tabsById: nextTabsById,
+            tabOrderByCollection: nextTabOrderByCollection,
+            activeTabIdByCollection: nextActiveTabByCollection,
+            currentCollectionId: nextCurrentCollectionId,
+          } as WorkspaceStore & WorkspaceUiState,
+          nextCurrentCollectionId,
+        );
+
+        return {
+          tabsById: ensured.tabsById,
+          tabOrderByCollection: ensured.tabOrderByCollection,
+          activeTabIdByCollection: ensured.activeTabIdByCollection,
+          currentCollectionId: ensured.currentCollectionId,
+        };
+      }
+
+      return {
+        tabsById: nextTabsById,
+        tabOrderByCollection: nextTabOrderByCollection,
+        activeTabIdByCollection: nextActiveTabByCollection,
+        currentCollectionId: "",
+      };
+    });
+    scheduleWorkspaceSave(get);
   },
 
   createEnvironment: () => {

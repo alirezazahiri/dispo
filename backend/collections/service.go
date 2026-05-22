@@ -25,6 +25,10 @@ func (s *Service) Startup(ctx context.Context) {
 	s.ctx = ctx
 }
 
+func (s *Service) Close() error {
+	return s.repo.Close()
+}
+
 func (s *Service) LoadAllCollections() ([]api.CollectionTreePayload, error) {
 	return s.repo.LoadAllCollections()
 }
@@ -67,4 +71,12 @@ func (s *Service) MoveRequest(input api.MoveSavedRequestInput) error {
 
 func (s *Service) DeleteRequest(input api.DeleteEntityInput) error {
 	return s.repo.DeleteRequest(input.ID)
+}
+
+func (s *Service) RenameRequest(input api.RenameRequestInput) error {
+	return s.repo.RenameRequest(input.ID, input.Name)
+}
+
+func (s *Service) DuplicateRequest(input api.DeleteEntityInput) (api.SavedRequestPayload, error) {
+	return s.repo.DuplicateRequest(input.ID)
 }

@@ -59,5 +59,9 @@ export const backendClient = {
       }) as Promise<void>,
     deleteRequest: (id: string) =>
       CollectionsService.DeleteRequest({ id }) as Promise<void>,
+    renameRequest: (id: string, name: string) =>
+      CollectionsService.RenameRequest({ id, name }) as Promise<void>,
+    duplicateRequest: (id: string) =>
+      CollectionsService.DuplicateRequest({ id }) as Promise<SavedRequestPayload>,
   },
 };

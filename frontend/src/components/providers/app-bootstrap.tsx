@@ -32,6 +32,9 @@ export function AppBootstrap({ children }: PropsWithChildren) {
           useWorkspaceStore.getState().initialize(),
         ]);
 
+        const { collectionOrder } = useCollectionsStore.getState();
+        useWorkspaceStore.getState().reconcileCollections(collectionOrder);
+
         if (!cancelled) {
           setStatus("ready");
         }

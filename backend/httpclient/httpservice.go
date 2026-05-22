@@ -138,6 +138,10 @@ func (s *HTTPService) SaveWorkspaceState(state api.WorkspaceStatePayload) error 
 	return s.workspaceStore.SaveState(state)
 }
 
+func (s *HTTPService) Close() error {
+	return s.workspaceStore.Close()
+}
+
 func sameSiteToString(value http.SameSite) string {
 	switch value {
 	case http.SameSiteStrictMode:

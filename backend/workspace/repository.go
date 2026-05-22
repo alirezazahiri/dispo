@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -18,8 +17,7 @@ type Repository struct {
 }
 
 const (
-	defaultCollectionID   = "default-collection"
-	defaultCollectionName = "Workspace"
+	defaultCollectionID = "default-collection"
 )
 
 func NewRepository() (*Repository, error) {
@@ -57,6 +55,10 @@ func (r *Repository) Close() error {
 }
 
 func (r *Repository) initSchema() error {
+	if _, err := r.db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		return fmt.Errorf("enable foreign keys: %w", err)
+	}
+
 	schemaStatements := []string{
 		`CREATE TABLE IF NOT EXISTS workspace_meta (
 			id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -65,14 +67,6 @@ func (r *Repository) initSchema() error {
 			active_tab_by_collection_json TEXT NOT NULL DEFAULT '{}',
 			current_collection_id TEXT NOT NULL DEFAULT '` + defaultCollectionID + `',
 			active_environment_id TEXT NOT NULL DEFAULT ''
-		)`,
-		`CREATE TABLE IF NOT EXISTS collections (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			description TEXT NOT NULL DEFAULT '',
-			sort_order INTEGER NOT NULL DEFAULT 0,
-			created_at INTEGER NOT NULL,
-			updated_at INTEGER NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS request_tabs (
 			id TEXT PRIMARY KEY,
@@ -88,7 +82,9 @@ func (r *Repository) initSchema() error {
 			bearer_token TEXT NOT NULL DEFAULT '',
 			response_json TEXT NOT NULL DEFAULT '',
 			created_at INTEGER NOT NULL,
-			updated_at INTEGER NOT NULL
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+			FOREIGN KEY(saved_request_id) REFERENCES saved_requests(id) ON DELETE SET NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS request_headers (
 			id TEXT PRIMARY KEY,
@@ -197,22 +193,14 @@ func (r *Repository) initSchema() error {
 	); err != nil {
 		return fmt.Errorf("normalize workspace_meta defaults: %w", err)
 	}
-
-	now := time.Now().UnixMilli()
-	if _, err := r.db.Exec(
-		`INSERT OR IGNORE INTO collections (id, name, description, sort_order, created_at, updated_at) VALUES (?, ?, '', 0, ?, ?)`,
-		defaultCollectionID,
-		defaultCollectionName,
-		now,
-		now,
-	); err != nil {
-		return fmt.Errorf("ensure default collection: %w", err)
-	}
 	if _, err := r.db.Exec(
 		`UPDATE request_tabs SET collection_id = ? WHERE collection_id IS NULL OR collection_id = ''`,
 		defaultCollectionID,
 	); err != nil {
 		return fmt.Errorf("assign default collection: %w", err)
+	}
+	if err := r.ensureRequestTabsForeignKeys(); err != nil {
+		return err
 	}
 
 	return nil
@@ -517,6 +505,121 @@ func (r *Repository) loadKeyValueRows(table string, foreignID string) ([]api.Key
 	}
 
 	return result, rows.Err()
+}
+
+func (r *Repository) ensureRequestTabsForeignKeys() error {
+	rows, err := r.db.Query(`PRAGMA foreign_key_list(request_tabs)`)
+	if err != nil {
+		return fmt.Errorf("read request_tabs foreign keys: %w", err)
+	}
+	defer rows.Close()
+
+	hasCollectionFK := false
+	hasSavedRequestFK := false
+	for rows.Next() {
+		var id int
+		var seq int
+		var table string
+		var from string
+		var to string
+		var onUpdate string
+		var onDelete string
+		var match string
+		if err := rows.Scan(&id, &seq, &table, &from, &to, &onUpdate, &onDelete, &match); err != nil {
+			return fmt.Errorf("scan request_tabs foreign key: %w", err)
+		}
+		if table == "collections" && from == "collection_id" {
+			hasCollectionFK = true
+		}
+		if table == "saved_requests" && from == "saved_request_id" {
+			hasSavedRequestFK = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate request_tabs foreign keys: %w", err)
+	}
+	if hasCollectionFK && hasSavedRequestFK {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin request_tabs migration transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err = tx.Exec(`
+		CREATE TABLE request_tabs_new (
+			id TEXT PRIMARY KEY,
+			collection_id TEXT NOT NULL DEFAULT '` + defaultCollectionID + `',
+			saved_request_id TEXT,
+			layout TEXT NOT NULL,
+			protocol TEXT NOT NULL,
+			title TEXT NOT NULL,
+			method TEXT NOT NULL,
+			url TEXT NOT NULL,
+			body TEXT NOT NULL,
+			auth_type TEXT NOT NULL DEFAULT 'none',
+			bearer_token TEXT NOT NULL DEFAULT '',
+			pre_request_script TEXT NOT NULL DEFAULT '',
+			post_response_script TEXT NOT NULL DEFAULT '',
+			response_json TEXT NOT NULL DEFAULT '',
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+			FOREIGN KEY(saved_request_id) REFERENCES saved_requests(id) ON DELETE SET NULL
+		)
+	`); err != nil {
+		return fmt.Errorf("create request_tabs_new: %w", err)
+	}
+
+	if _, err = tx.Exec(`
+		INSERT INTO request_tabs_new (
+			id, collection_id, saved_request_id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+		)
+		SELECT
+			request_tabs.id,
+			COALESCE(collections.id, ?),
+			CASE
+				WHEN saved_requests.id IS NULL THEN NULL
+				ELSE request_tabs.saved_request_id
+			END,
+			request_tabs.layout,
+			request_tabs.protocol,
+			request_tabs.title,
+			request_tabs.method,
+			request_tabs.url,
+			request_tabs.body,
+			request_tabs.auth_type,
+			request_tabs.bearer_token,
+			request_tabs.pre_request_script,
+			request_tabs.post_response_script,
+			request_tabs.response_json,
+			request_tabs.created_at,
+			request_tabs.updated_at
+		FROM request_tabs
+		LEFT JOIN collections ON collections.id = request_tabs.collection_id
+		LEFT JOIN saved_requests ON saved_requests.id = request_tabs.saved_request_id
+	`, defaultCollectionID); err != nil {
+		return fmt.Errorf("copy request_tabs data: %w", err)
+	}
+
+	if _, err = tx.Exec(`DROP TABLE request_tabs`); err != nil {
+		return fmt.Errorf("drop legacy request_tabs: %w", err)
+	}
+	if _, err = tx.Exec(`ALTER TABLE request_tabs_new RENAME TO request_tabs`); err != nil {
+		return fmt.Errorf("rename request_tabs_new: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit request_tabs migration transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Repository) ensureColumnExists(

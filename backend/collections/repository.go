@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"dispo/backend/api"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -16,6 +18,11 @@ import (
 type Repository struct {
 	db *sql.DB
 }
+
+const (
+	defaultCollectionID   = "default-collection"
+	defaultCollectionName = "Workspace"
+)
 
 func NewRepository() (*Repository, error) {
 	configDir, err := os.UserConfigDir()
@@ -41,6 +48,14 @@ func NewRepository() (*Repository, error) {
 	}
 
 	return repo, nil
+}
+
+func (r *Repository) Close() error {
+	if r.db == nil {
+		return nil
+	}
+
+	return r.db.Close()
 }
 
 func (r *Repository) initSchema() error {
@@ -110,6 +125,23 @@ func (r *Repository) initSchema() error {
 		if _, err := r.db.Exec(statement); err != nil {
 			return fmt.Errorf("apply collections schema statement: %w", err)
 		}
+	}
+
+	now := time.Now().UnixMilli()
+	if _, err := r.db.Exec(
+		`INSERT OR IGNORE INTO collections (id, name, description, sort_order, created_at, updated_at) VALUES (?, ?, '', 0, ?, ?)`,
+		defaultCollectionID,
+		defaultCollectionName,
+		now,
+		now,
+	); err != nil {
+		return fmt.Errorf("ensure default collection: %w", err)
+	}
+
+	// Flatten existing nested folders to match the supported tree depth:
+	// collection -> folder.
+	if _, err := r.db.Exec(`UPDATE folders SET parent_folder_id = NULL WHERE parent_folder_id IS NOT NULL`); err != nil {
+		return fmt.Errorf("flatten nested folders: %w", err)
 	}
 
 	return nil
@@ -210,13 +242,18 @@ func (r *Repository) DeleteCollection(id string) error {
 }
 
 func (r *Repository) CreateFolder(input api.CreateFolderInput) (api.FolderPayload, error) {
+	if input.ParentFolderID != nil {
+		return api.FolderPayload{}, errors.New("nested folders are not supported")
+	}
+
 	now := time.Now().UnixMilli()
 	folder := api.FolderPayload{
 		ID:             newID(),
 		CollectionID:   input.CollectionID,
 		ParentFolderID: input.ParentFolderID,
 		Name:           input.Name,
-		SortOrder:      r.nextSortOrder("folders", "collection_id = ?", input.CollectionID),
+		// With max depth enforced, folder sort order is scoped to the collection root.
+		SortOrder: r.nextSortOrder("folders", "collection_id = ? AND parent_folder_id IS NULL", input.CollectionID),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -239,6 +276,10 @@ func (r *Repository) RenameFolder(input api.RenameFolderInput) error {
 }
 
 func (r *Repository) MoveFolder(input api.MoveFolderInput) error {
+	if input.NewParentFolderID != nil {
+		return errors.New("nested folders are not supported")
+	}
+
 	_, err := r.db.Exec(
 		`UPDATE folders SET parent_folder_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
 		input.NewParentFolderID,
@@ -250,6 +291,47 @@ func (r *Repository) MoveFolder(input api.MoveFolderInput) error {
 		return fmt.Errorf("move folder: %w", err)
 	}
 	return nil
+}
+
+func (r *Repository) RenameRequest(id string, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("request name cannot be empty")
+	}
+
+	result, err := r.db.Exec(
+		`UPDATE saved_requests SET name = ?, updated_at = ? WHERE id = ?`,
+		name,
+		time.Now().UnixMilli(),
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("rename saved request: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("check rename affected rows: %w", err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("saved request not found: %s", id)
+	}
+
+	return nil
+}
+
+func (r *Repository) DuplicateRequest(id string) (api.SavedRequestPayload, error) {
+	request, err := r.loadSavedRequestByID(id)
+	if err != nil {
+		return api.SavedRequestPayload{}, err
+	}
+
+	now := time.Now().UnixMilli()
+	request.ID = ""
+	request.Name = request.Name + " Copy"
+	request.CreatedAt = now
+	request.UpdatedAt = now
+
+	return r.SaveRequest(request)
 }
 
 func (r *Repository) DeleteFolder(id string) error {
@@ -289,11 +371,11 @@ func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequ
 	} else {
 		_, err = tx.Exec(
 			`UPDATE saved_requests
-			 SET collection_id = ?, folder_id = ?, name = ?, method = ?, url = ?, body = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = ?, updated_at = ?
+			 SET collection_id = ?, folder_id = ?, name = ?, method = ?, url = ?, body = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = CASE WHEN ? < 0 THEN sort_order ELSE ? END, updated_at = ?
 			 WHERE id = ?`,
 			payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body,
 			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
-			payload.SortOrder, payload.UpdatedAt, payload.ID,
+			payload.SortOrder, payload.SortOrder, payload.UpdatedAt, payload.ID,
 		)
 	}
 	if err != nil {
@@ -359,6 +441,38 @@ func (r *Repository) DeleteRequest(id string) error {
 		return fmt.Errorf("delete saved request: %w", err)
 	}
 	return nil
+}
+
+func (r *Repository) loadSavedRequestByID(id string) (api.SavedRequestPayload, error) {
+	var request api.SavedRequestPayload
+	err := r.db.QueryRow(`
+		SELECT id, collection_id, folder_id, name, method, url, body, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
+		FROM saved_requests
+		WHERE id = ?
+	`, id).Scan(
+		&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body,
+		&request.PreRequestScript, &request.PostResponseScript, &request.Auth.Type, &request.Auth.BearerToken,
+		&request.SortOrder, &request.CreatedAt, &request.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return api.SavedRequestPayload{}, fmt.Errorf("saved request not found: %s", id)
+		}
+		return api.SavedRequestPayload{}, fmt.Errorf("query saved request: %w", err)
+	}
+
+	headers, err := r.loadRequestRows("saved_request_headers", request.ID)
+	if err != nil {
+		return api.SavedRequestPayload{}, err
+	}
+	params, err := r.loadRequestRows("saved_request_query_params", request.ID)
+	if err != nil {
+		return api.SavedRequestPayload{}, err
+	}
+	request.Headers = headers
+	request.QueryParams = params
+
+	return request, nil
 }
 
 func (r *Repository) loadFolders(collectionID string) ([]api.FolderPayload, error) {

@@ -3,6 +3,8 @@
 import {api} from '../models';
 import {context} from '../models';
 
+export function Close():Promise<void>;
+
 export function LoadWorkspaceState():Promise<api.WorkspaceStatePayload>;
 
 export function SaveWorkspaceState(arg1:api.WorkspaceStatePayload):Promise<void>;

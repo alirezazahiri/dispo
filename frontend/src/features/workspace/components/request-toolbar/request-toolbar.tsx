@@ -96,8 +96,12 @@ export function RequestToolbar({ tab }: Props) {
   const handleUrlChange = (url: string) => {
     updateTab(tab.id, {
       url,
-
-      title: url.length > 0 ? url : "New Request",
+      title:
+        tab.savedRequestId == null
+          ? url.length > 0
+            ? url
+            : "New Request"
+          : tab.title,
 
       isDirty: true,
     });

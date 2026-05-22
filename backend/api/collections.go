@@ -68,6 +68,11 @@ type RenameFolderInput struct {
 	Name string `json:"name"`
 }
 
+type RenameRequestInput struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type MoveFolderInput struct {
 	ID                string  `json:"id"`
 	NewParentFolderID *string `json:"newParentFolderId,omitempty"`
