@@ -23,3 +23,4 @@ export * from "./tooltip";
 export * from "./label";
 export * from "./toggle";
 export * from "./toggle-group";
+export * from "./popover";
