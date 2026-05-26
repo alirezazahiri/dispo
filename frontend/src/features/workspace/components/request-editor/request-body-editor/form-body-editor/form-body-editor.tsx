@@ -105,7 +105,6 @@ export function FormBodyEditor({ tab }: Props) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="text-sm text-muted-foreground">Form Data</div>
           <Select value={subtype} onValueChange={handleSubtypeChange}>
             <SelectTrigger className="h-8 w-[180px] text-xs">
               <SelectValue />

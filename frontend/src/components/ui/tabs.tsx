@@ -1,25 +1,38 @@
 "use client";
 
-import * as React from "react";
+import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
+import { useWheelToHorizontalScroll } from "@/hooks/use-wheel-to-horizontal";
 
 const Tabs = TabsPrimitive.Root;
 
-const TabsList = React.forwardRef<
+const TabsList = forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-10 max-w-full min-w-0 items-center justify-center overflow-x-auto rounded-md bg-muted p-1 text-muted-foreground scrollbar-hidden",
-      className,
-    )}
-    {...props}
-  />
-));
+>(({ className, ...props }, forwardedRef) => {
+  const ref = useRef<React.ElementRef<typeof TabsPrimitive.List>>(null);
+
+  useImperativeHandle(
+    forwardedRef,
+    () => ref.current as React.ElementRef<typeof TabsPrimitive.List>,
+    [],
+  );
+
+  useWheelToHorizontalScroll({ ref });
+
+  return (
+    <TabsPrimitive.List
+      ref={ref}
+      className={cn(
+        "inline-flex h-10 max-w-full min-w-0 items-center justify-[safe_center] overflow-x-auto rounded-md bg-muted p-1 text-muted-foreground scrollbar-hidden",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
 TabsList.displayName = TabsPrimitive.List.displayName;
 
 const TabsTrigger = React.forwardRef<
