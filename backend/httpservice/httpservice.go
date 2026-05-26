@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type HTTPService struct {
@@ -36,11 +40,23 @@ func (a *HTTPService) SendHttpRequest(
 		Timeout: 60 * time.Second,
 	}
 
-	request, err := http.NewRequest(
-		req.Method,
-		req.URL,
-		strings.NewReader(req.Body),
-	)
+	built, err := buildRequestBody(req)
+	if err != nil {
+		return &api.HttpResponsePayload{
+			Status:     0,
+			StatusText: "Invalid Request Body",
+			Headers:    map[string]string{},
+			Cookies:    []api.ResponseCookiePayload{},
+			Body:       "",
+			Duration:   time.Since(start).Milliseconds(),
+			Error:      err.Error(),
+		}, nil
+	}
+	if built.cleanup != nil {
+		defer built.cleanup()
+	}
+
+	request, err := http.NewRequest(req.Method, req.URL, built.reader)
 
 	if err != nil {
 		return &api.HttpResponsePayload{
@@ -54,11 +70,9 @@ func (a *HTTPService) SendHttpRequest(
 		}, nil
 	}
 
-	request.Header.Set("User-Agent", "dispo/1.0")
+	request.Header.Set("User-Agent", "Dispo/1.0")
 
-	for key, value := range req.Headers {
-		request.Header.Set(key, value)
-	}
+	applyHeaders(request, req.Headers, built)
 
 	response, err := client.Do(request)
 
@@ -136,6 +150,77 @@ func (s *HTTPService) LoadWorkspaceState() (*api.WorkspaceStatePayload, error) {
 
 func (s *HTTPService) SaveWorkspaceState(state api.WorkspaceStatePayload) error {
 	return s.workspaceStore.SaveState(state)
+}
+
+// PickFile opens the OS-native open-file dialog and returns metadata for
+// the selected file (size + sniffed content type) along with its
+// absolute path. The path is what the frontend should hand back to
+// SendHttpRequest in `file` body mode or as `formFields[].filePath` for
+// multipart form parts.
+//
+// If the user dismisses the dialog the returned PickFileResult has
+// Cancelled=true and all other fields zero-valued; callers should treat
+// that as a no-op rather than an error.
+func (s *HTTPService) PickFile(options api.PickFileOptions) (api.PickFileResult, error) {
+	if s.ctx == nil {
+		return api.PickFileResult{}, fmt.Errorf("file picker is not available before app startup")
+	}
+
+	filters := make([]wailsruntime.FileFilter, 0, len(options.Filters))
+	for _, filter := range options.Filters {
+		filters = append(filters, wailsruntime.FileFilter{
+			DisplayName: filter.DisplayName,
+			Pattern:     filter.Pattern,
+		})
+	}
+
+	path, err := wailsruntime.OpenFileDialog(s.ctx, wailsruntime.OpenDialogOptions{
+		Title:                options.Title,
+		DefaultDirectory:     options.DefaultDir,
+		DefaultFilename:      options.DefaultName,
+		Filters:              filters,
+		CanCreateDirectories: false,
+	})
+	if err != nil {
+		return api.PickFileResult{}, fmt.Errorf("open file dialog: %w", err)
+	}
+	if path == "" {
+		return api.PickFileResult{Cancelled: true}, nil
+	}
+
+	stat, err := os.Stat(path)
+	if err != nil {
+		return api.PickFileResult{}, fmt.Errorf("stat picked file: %w", err)
+	}
+
+	contentType := sniffContentType(path)
+
+	return api.PickFileResult{
+		Path:        path,
+		Name:        filepath.Base(path),
+		Size:        stat.Size(),
+		ContentType: contentType,
+	}, nil
+}
+
+// sniffContentType reads up to 512 bytes from `path` and asks Go's
+// stdlib MIME detector for a best-effort guess. Falls back to
+// `application/octet-stream` on any I/O error or when the file is
+// shorter than the sniff window.
+func sniffContentType(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return "application/octet-stream"
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return "application/octet-stream"
+	}
+
+	return http.DetectContentType(buffer[:n])
 }
 
 func (s *HTTPService) Close() error {

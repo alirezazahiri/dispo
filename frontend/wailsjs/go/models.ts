@@ -54,6 +54,52 @@ export namespace api {
 	        this.enabled = source["enabled"];
 	    }
 	}
+	export class FileBodyPayload {
+	    name: string;
+	    path: string;
+	    contentType: string;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileBodyPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.contentType = source["contentType"];
+	        this.size = source["size"];
+	    }
+	}
+	export class FormBodyFieldPayload {
+	    id: string;
+	    enabled: boolean;
+	    kind: string;
+	    key: string;
+	    value: string;
+	    fileName?: string;
+	    filePath?: string;
+	    fileContentType?: string;
+	    fileSize?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FormBodyFieldPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.enabled = source["enabled"];
+	        this.kind = source["kind"];
+	        this.key = source["key"];
+	        this.value = source["value"];
+	        this.fileName = source["fileName"];
+	        this.filePath = source["filePath"];
+	        this.fileContentType = source["fileContentType"];
+	        this.fileSize = source["fileSize"];
+	    }
+	}
 	export class SavedRequestPayload {
 	    id: string;
 	    collectionId: string;
@@ -61,7 +107,15 @@ export namespace api {
 	    name: string;
 	    method: string;
 	    url: string;
+	    bodyMode: string;
 	    body: string;
+	    bodyContentType: string;
+	    formSubtype: string;
+	    formFields: FormBodyFieldPayload[];
+	    fileContentType: string;
+	    fileBody?: FileBodyPayload;
+	    graphqlQuery: string;
+	    graphqlVariables: string;
 	    preRequestScript: string;
 	    postResponseScript: string;
 	    headers: KeyValuePayload[];
@@ -83,7 +137,15 @@ export namespace api {
 	        this.name = source["name"];
 	        this.method = source["method"];
 	        this.url = source["url"];
+	        this.bodyMode = source["bodyMode"];
 	        this.body = source["body"];
+	        this.bodyContentType = source["bodyContentType"];
+	        this.formSubtype = source["formSubtype"];
+	        this.formFields = this.convertValues(source["formFields"], FormBodyFieldPayload);
+	        this.fileContentType = source["fileContentType"];
+	        this.fileBody = this.convertValues(source["fileBody"], FileBodyPayload);
+	        this.graphqlQuery = source["graphqlQuery"];
+	        this.graphqlVariables = source["graphqlVariables"];
 	        this.preRequestScript = source["preRequestScript"];
 	        this.postResponseScript = source["postResponseScript"];
 	        this.headers = this.convertValues(source["headers"], KeyValuePayload);
@@ -247,12 +309,48 @@ export namespace api {
 		}
 	}
 	
+	export class FileDialogFilter {
+	    displayName: string;
+	    pattern: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileDialogFilter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.displayName = source["displayName"];
+	        this.pattern = source["pattern"];
+	    }
+	}
+	
+	
+	export class GraphQLBodyPayload {
+	    query: string;
+	    variables: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GraphQLBodyPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.variables = source["variables"];
+	    }
+	}
 	export class HttpRequestPayload {
 	    id: string;
 	    method: string;
 	    url: string;
 	    headers: Record<string, string>;
+	    bodyMode?: string;
 	    body?: string;
+	    formSubtype?: string;
+	    formFields?: FormBodyFieldPayload[];
+	    file?: FileBodyPayload;
+	    fileContentType?: string;
+	    graphql?: GraphQLBodyPayload;
 	
 	    static createFrom(source: any = {}) {
 	        return new HttpRequestPayload(source);
@@ -264,8 +362,32 @@ export namespace api {
 	        this.method = source["method"];
 	        this.url = source["url"];
 	        this.headers = source["headers"];
+	        this.bodyMode = source["bodyMode"];
 	        this.body = source["body"];
+	        this.formSubtype = source["formSubtype"];
+	        this.formFields = this.convertValues(source["formFields"], FormBodyFieldPayload);
+	        this.file = this.convertValues(source["file"], FileBodyPayload);
+	        this.fileContentType = source["fileContentType"];
+	        this.graphql = this.convertValues(source["graphql"], GraphQLBodyPayload);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ResponseCookiePayload {
 	    name: string;
@@ -368,6 +490,62 @@ export namespace api {
 	        this.newSortOrder = source["newSortOrder"];
 	    }
 	}
+	export class PickFileOptions {
+	    title?: string;
+	    defaultDirectory?: string;
+	    defaultFilename?: string;
+	    filters?: FileDialogFilter[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PickFileOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.defaultDirectory = source["defaultDirectory"];
+	        this.defaultFilename = source["defaultFilename"];
+	        this.filters = this.convertValues(source["filters"], FileDialogFilter);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PickFileResult {
+	    path: string;
+	    name: string;
+	    size: number;
+	    contentType: string;
+	    cancelled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PickFileResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.name = source["name"];
+	        this.size = source["size"];
+	        this.contentType = source["contentType"];
+	        this.cancelled = source["cancelled"];
+	    }
+	}
 	export class RenameCollectionInput {
 	    id: string;
 	    name: string;
@@ -410,6 +588,52 @@ export namespace api {
 	        this.name = source["name"];
 	    }
 	}
+	export class ReorderSavedRequestItem {
+	    id: string;
+	    newFolderId?: string;
+	    newSortOrder: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReorderSavedRequestItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.newFolderId = source["newFolderId"];
+	        this.newSortOrder = source["newSortOrder"];
+	    }
+	}
+	export class ReorderSavedRequestsInput {
+	    items: ReorderSavedRequestItem[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ReorderSavedRequestsInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], ReorderSavedRequestItem);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class RequestTabPayload {
 	    id: string;
@@ -420,7 +644,15 @@ export namespace api {
 	    title: string;
 	    method: string;
 	    url: string;
+	    bodyMode: string;
 	    body: string;
+	    bodyContentType: string;
+	    formSubtype: string;
+	    formFields: FormBodyFieldPayload[];
+	    fileContentType: string;
+	    fileBody?: FileBodyPayload;
+	    graphqlQuery: string;
+	    graphqlVariables: string;
 	    preRequestScript: string;
 	    postResponseScript: string;
 	    headers: KeyValuePayload[];
@@ -444,7 +676,15 @@ export namespace api {
 	        this.title = source["title"];
 	        this.method = source["method"];
 	        this.url = source["url"];
+	        this.bodyMode = source["bodyMode"];
 	        this.body = source["body"];
+	        this.bodyContentType = source["bodyContentType"];
+	        this.formSubtype = source["formSubtype"];
+	        this.formFields = this.convertValues(source["formFields"], FormBodyFieldPayload);
+	        this.fileContentType = source["fileContentType"];
+	        this.fileBody = this.convertValues(source["fileBody"], FileBodyPayload);
+	        this.graphqlQuery = source["graphqlQuery"];
+	        this.graphqlVariables = source["graphqlVariables"];
 	        this.preRequestScript = source["preRequestScript"];
 	        this.postResponseScript = source["postResponseScript"];
 	        this.headers = this.convertValues(source["headers"], KeyValuePayload);

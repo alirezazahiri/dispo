@@ -36,7 +36,12 @@ func NewRepository() (*Repository, error) {
 	}
 
 	dbPath := filepath.Join(dbDir, "workspace.db")
-	db, err := sql.Open("sqlite", dbPath)
+	// busy_timeout makes SQLite wait briefly for the write lock instead of
+	// returning SQLITE_BUSY immediately. Important because the workspace and
+	// collections services share the same file with independent connection
+	// pools.
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)", dbPath)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}
@@ -125,6 +130,18 @@ func (r *Repository) initSchema() error {
 		if _, err := r.db.Exec(statement); err != nil {
 			return fmt.Errorf("apply collections schema statement: %w", err)
 		}
+	}
+
+	// `body_meta_json` mirrors the structured body extras stored on the
+	// workspace `request_tabs` table — populated when the request body
+	// editor gained general modes (none/form/file/graphql). Legacy
+	// `body` is preserved so older saves continue to read back as text.
+	if err := r.ensureColumnExists(
+		"saved_requests",
+		"body_meta_json",
+		`ALTER TABLE saved_requests ADD COLUMN body_meta_json TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return err
 	}
 
 	now := time.Now().UnixMilli()
@@ -359,19 +376,24 @@ func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequ
 		}
 	}()
 
+	bodyMetaJSON, err := api.MarshalBodyMeta(bodyMetaFromSavedRequest(payload))
+	if err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("marshal body meta: %w", err)
+	}
+
 	if isCreate {
 		_, err = tx.Exec(
-			`INSERT INTO saved_requests (id, collection_id, folder_id, name, method, url, body, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			payload.ID, payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body,
+			`INSERT INTO saved_requests (id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			payload.ID, payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body, bodyMetaJSON,
 			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
 			payload.SortOrder, payload.CreatedAt, payload.UpdatedAt,
 		)
 	} else {
 		_, err = tx.Exec(
 			`UPDATE saved_requests
-			 SET collection_id = ?, folder_id = ?, name = ?, method = ?, url = ?, body = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = CASE WHEN ? < 0 THEN sort_order ELSE ? END, updated_at = ?
+			 SET collection_id = ?, folder_id = ?, name = ?, method = ?, url = ?, body = ?, body_meta_json = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = CASE WHEN ? < 0 THEN sort_order ELSE ? END, updated_at = ?
 			 WHERE id = ?`,
-			payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body,
+			payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body, bodyMetaJSON,
 			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
 			payload.SortOrder, payload.SortOrder, payload.UpdatedAt, payload.ID,
 		)
@@ -434,6 +456,47 @@ func (r *Repository) MoveRequest(input api.MoveSavedRequestInput) error {
 	return nil
 }
 
+// ReorderRequests applies an ordered batch of folder/sortOrder updates inside
+// a single SQL transaction. This avoids the SQLITE_BUSY contention that would
+// otherwise happen if the frontend issued many parallel MoveRequest calls.
+func (r *Repository) ReorderRequests(input api.ReorderSavedRequestsInput) error {
+	if len(input.Items) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin reorder transaction: %w", err)
+	}
+
+	stmt, err := tx.Prepare(
+		`UPDATE saved_requests SET folder_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("prepare reorder statement: %w", err)
+	}
+
+	now := time.Now().UnixMilli()
+	for _, item := range input.Items {
+		if _, err := stmt.Exec(item.NewFolderID, item.NewSortOrder, now, item.ID); err != nil {
+			_ = stmt.Close()
+			_ = tx.Rollback()
+			return fmt.Errorf("reorder saved request %s: %w", item.ID, err)
+		}
+	}
+
+	if err := stmt.Close(); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("close reorder statement: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit reorder transaction: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) DeleteRequest(id string) error {
 	if _, err := r.db.Exec(`DELETE FROM saved_requests WHERE id = ?`, id); err != nil {
 		return fmt.Errorf("delete saved request: %w", err)
@@ -443,12 +506,13 @@ func (r *Repository) DeleteRequest(id string) error {
 
 func (r *Repository) loadSavedRequestByID(id string) (api.SavedRequestPayload, error) {
 	var request api.SavedRequestPayload
+	var bodyMetaJSON string
 	err := r.db.QueryRow(`
-		SELECT id, collection_id, folder_id, name, method, url, body, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
+		SELECT id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
 		FROM saved_requests
 		WHERE id = ?
 	`, id).Scan(
-		&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body,
+		&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body, &bodyMetaJSON,
 		&request.PreRequestScript, &request.PostResponseScript, &request.Auth.Type, &request.Auth.BearerToken,
 		&request.SortOrder, &request.CreatedAt, &request.UpdatedAt,
 	)
@@ -458,6 +522,12 @@ func (r *Repository) loadSavedRequestByID(id string) (api.SavedRequestPayload, e
 		}
 		return api.SavedRequestPayload{}, fmt.Errorf("query saved request: %w", err)
 	}
+
+	meta, err := api.UnmarshalBodyMeta(bodyMetaJSON)
+	if err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("unmarshal body meta: %w", err)
+	}
+	applyBodyMetaToSavedRequest(&request, meta)
 
 	headers, err := r.loadRequestRows("saved_request_headers", request.ID)
 	if err != nil {
@@ -501,7 +571,7 @@ func (r *Repository) loadFolders(collectionID string) ([]api.FolderPayload, erro
 
 func (r *Repository) loadSavedRequests(collectionID string) ([]api.SavedRequestPayload, error) {
 	rows, err := r.db.Query(`
-		SELECT id, collection_id, folder_id, name, method, url, body, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
+		SELECT id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
 		FROM saved_requests
 		WHERE collection_id = ?
 		ORDER BY sort_order ASC, created_at ASC
@@ -514,13 +584,21 @@ func (r *Repository) loadSavedRequests(collectionID string) ([]api.SavedRequestP
 	requests := make([]api.SavedRequestPayload, 0)
 	for rows.Next() {
 		var request api.SavedRequestPayload
+		var bodyMetaJSON string
 		if err := rows.Scan(
-			&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body,
+			&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body, &bodyMetaJSON,
 			&request.PreRequestScript, &request.PostResponseScript, &request.Auth.Type, &request.Auth.BearerToken,
 			&request.SortOrder, &request.CreatedAt, &request.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan saved request: %w", err)
 		}
+
+		meta, err := api.UnmarshalBodyMeta(bodyMetaJSON)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal body meta: %w", err)
+		}
+		applyBodyMetaToSavedRequest(&request, meta)
+
 		headers, err := r.loadRequestRows("saved_request_headers", request.ID)
 		if err != nil {
 			return nil, err
@@ -559,6 +637,53 @@ func (r *Repository) loadRequestRows(table string, requestID string) ([]api.KeyV
 	return result, rows.Err()
 }
 
+// bodyMetaFromSavedRequest mirrors the workspace repository helper. We
+// keep these as small, type-local functions so each package owns its own
+// translation between API payload and the shared BodyMetaPayload blob.
+func bodyMetaFromSavedRequest(request api.SavedRequestPayload) api.BodyMetaPayload {
+	return api.BodyMetaPayload{
+		BodyMode:         request.BodyMode,
+		BodyContentType:  request.BodyContentType,
+		FormSubtype:      request.FormSubtype,
+		FormFields:       request.FormFields,
+		FileContentType:  request.FileContentType,
+		FileBody:         request.FileBody,
+		GraphQLQuery:     request.GraphQLQuery,
+		GraphQLVariables: request.GraphQLVariables,
+	}
+}
+
+func applyBodyMetaToSavedRequest(request *api.SavedRequestPayload, meta api.BodyMetaPayload) {
+	request.BodyMode = meta.BodyMode
+	request.BodyContentType = meta.BodyContentType
+	request.FormSubtype = meta.FormSubtype
+	request.FormFields = meta.FormFields
+	if request.FormFields == nil {
+		request.FormFields = []api.FormBodyFieldPayload{}
+	}
+	request.FileContentType = meta.FileContentType
+	request.FileBody = meta.FileBody
+	request.GraphQLQuery = meta.GraphQLQuery
+	request.GraphQLVariables = meta.GraphQLVariables
+
+	if request.BodyMode == "" {
+		if request.Body != "" {
+			request.BodyMode = api.BodyModeText
+		} else {
+			request.BodyMode = api.BodyModeNone
+		}
+	}
+	if request.BodyContentType == "" {
+		request.BodyContentType = "application/json"
+	}
+	if request.FormSubtype == "" {
+		request.FormSubtype = api.FormSubtypeURLEncoded
+	}
+	if request.FileContentType == "" {
+		request.FileContentType = "application/octet-stream"
+	}
+}
+
 func (r *Repository) nextSortOrder(table string, whereClause string, args ...any) int {
 	query := fmt.Sprintf("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM %s WHERE %s", table, whereClause)
 	var value int
@@ -573,6 +698,46 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+// ensureColumnExists adds `column` to `table` if it isn't already
+// present. Used for incremental schema migrations that can't piggy-back
+// off `CREATE TABLE IF NOT EXISTS`.
+func (r *Repository) ensureColumnExists(
+	table string,
+	column string,
+	addColumnStatement string,
+) error {
+	rows, err := r.db.Query(fmt.Sprintf(`PRAGMA table_info(%s)`, table))
+	if err != nil {
+		return fmt.Errorf("read table info for %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue sql.NullString
+		var primaryKey int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return fmt.Errorf("scan table info row for %s: %w", table, err)
+		}
+		if name == column {
+			return nil
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate table info for %s: %w", table, err)
+	}
+
+	if _, err := r.db.Exec(addColumnStatement); err != nil {
+		return fmt.Errorf("add missing column %s.%s: %w", table, column, err)
+	}
+
+	return nil
 }
 
 func newID() string {

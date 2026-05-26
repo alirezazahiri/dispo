@@ -19,7 +19,7 @@ export function MonacoBaseEditor({
   beforeMount,
 }: Props) {
   const { resolvedTheme } = useTheme();
-
+  console.log("language", language);
   return (
     <Editor
       defaultLanguage={defaultLanguage}

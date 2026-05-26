@@ -19,6 +19,7 @@ import { useHotkeys } from "@/hooks/use-hotkeys";
 import { UrlInput } from "./url-input";
 import { MethodSelect } from "./method-select";
 import { EnvironmentSelect } from "./enironment-select";
+import { buildRequestBody } from "../request-editor/request-body-editor/utils";
 import {
   createVariableMap,
   resolveTemplate,
@@ -126,7 +127,7 @@ export function RequestToolbar({ tab }: Props) {
       const initialRequest: ScriptRequestState = {
         method: tab.method,
         url: tab.url,
-        body: tab.body,
+        body: buildRequestBody(tab),
         headers: rowsToRecord(tab.headers),
         params: rowsToRecord(tab.queryParams),
       };
@@ -239,7 +240,25 @@ export function RequestToolbar({ tab }: Props) {
 
         headers: resolvedHeaders,
 
+        bodyMode: tab.bodyMode,
+
         body,
+
+        formSubtype: tab.formSubtype,
+
+        formFields: tab.formFields,
+
+        file: tab.bodyMode === "file" ? tab.fileBody : null,
+
+        fileContentType: tab.fileContentType,
+
+        graphql:
+          tab.bodyMode === "graphql"
+            ? {
+                query: tab.graphqlQuery,
+                variables: tab.graphqlVariables,
+              }
+            : null,
       });
 
       const postResult = await runPostResponseScript(tab.postResponseScript, {
@@ -307,7 +326,6 @@ export function RequestToolbar({ tab }: Props) {
         isDirty: false,
       });
     } catch (error) {
-      console.log({ error });
       const message = getErrorMessage(error);
 
       updateTab(tab.id, {

@@ -1,6 +1,7 @@
 import type { RequestTab } from "../../types";
 import { CopyButton } from "@/components/shared";
 import type { RequestSnapshot } from "../../types/response";
+import { buildRequestBody } from "../request-editor/request-body-editor/utils";
 
 type Props = {
   tab: RequestTab;
@@ -14,7 +15,7 @@ type DetailItem = {
 export function ResponseRequestDetailsView({ tab }: Props) {
   const snapshot = tab.response?.requestSnapshot;
   const details = buildRequestDetails(tab, snapshot);
-  const requestBody = snapshot?.body ?? tab.body ?? "";
+  const requestBody = snapshot?.body ?? buildRequestBody(tab);
   const subtitle = snapshot
     ? "Captured snapshot from the last send attempt."
     : "No send snapshot yet. Showing current request draft values.";
@@ -33,7 +34,7 @@ export function ResponseRequestDetailsView({ tab }: Props) {
           {details.map((item) => (
             <div
               key={item.label}
-              className="grid grid-cols-[160px_1fr] gap-3 rounded-md border border-border bg-card px-3 py-2"
+              className="grid grid-cols-[120px_1fr] gap-3 rounded-md border border-border bg-card px-3 py-2"
             >
               <div className="text-xs uppercase tracking-wide text-muted-foreground">
                 {item.label}
@@ -75,8 +76,6 @@ function buildRequestDetails(
       { label: "Content-Length", value: String(snapshot.contentLength) },
       { label: "User-Agent", value: snapshot.userAgent },
       { label: "Authorization", value: snapshot.authorization },
-      { label: "Headers Count", value: String(snapshot.headersCount) },
-      { label: "Query Params Count", value: String(snapshot.queryParamsCount) },
     ];
   }
 
@@ -91,20 +90,17 @@ function buildRequestDetails(
     return acc;
   }, {});
 
-  const body = tab.body || "";
+  const body = buildRequestBody(tab);
 
   const authorization =
     tab.auth.type === "bearer" && tab.auth.bearerToken.trim()
       ? `Bearer ${tab.auth.bearerToken}`
       : headersMap.authorization || "Not set";
 
-  const userAgent = headersMap["user-agent"] || "dispo/1.0";
+  const userAgent = headersMap["user-agent"] || "Dispo/1.0";
   const contentType = headersMap["content-type"] || "Not set";
   const host = extractHost(tab.url || "");
   const contentLength = String(new TextEncoder().encode(body).length);
-  const queryParamsCount = tab.queryParams.filter(
-    (param) => param.enabled && param.key.trim(),
-  ).length;
 
   return [
     { label: "Method", value: tab.method },
@@ -114,8 +110,6 @@ function buildRequestDetails(
     { label: "Content-Length", value: contentLength },
     { label: "User-Agent", value: userAgent },
     { label: "Authorization", value: authorization },
-    { label: "Headers Count", value: String(enabledHeaders.length) },
-    { label: "Query Params Count", value: String(queryParamsCount) },
   ];
 }
 

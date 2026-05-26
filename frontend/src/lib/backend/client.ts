@@ -6,6 +6,8 @@ import type {
   FolderPayload,
   HttpRequestPayload,
   HttpResponsePayload,
+  PickFileOptions,
+  PickFileResult,
   SavedRequestPayload,
   ScriptContextPayload,
   ScriptResultPayload,
@@ -18,7 +20,12 @@ import type {
 // generated bindings directly without per-call guards.
 export const backendClient = {
   sendHttpRequest: (payload: HttpRequestPayload) =>
-    HttpService.SendHttpRequest(payload) as Promise<HttpResponsePayload>,
+    // The Wails-generated `HttpRequestPayload` carries a `convertValues`
+    // helper that we don't need at the call site; cast through `any` for
+    // the same reason `collections.saveRequest` does.
+    HttpService.SendHttpRequest(payload as any) as Promise<HttpResponsePayload>,
+  pickFile: (options: PickFileOptions = {}) =>
+    HttpService.PickFile(options as any) as Promise<PickFileResult>,
   loadWorkspaceState: () =>
     (window as any).go.httpservice.HTTPService.LoadWorkspaceState() as Promise<WorkspaceStatePayload>,
   saveWorkspaceState: (state: WorkspaceStatePayload) =>
@@ -57,6 +64,23 @@ export const backendClient = {
         newFolderId: newFolderId ?? undefined,
         newSortOrder,
       }) as Promise<void>,
+    reorderRequests: (
+      items: Array<{
+        id: string;
+        newFolderId: string | null;
+        newSortOrder: number;
+      }>,
+    ) =>
+      // Cast through any: the Wails-generated type is a class with a
+      // `convertValues` method that we don't need at the call site — the
+      // runtime bridge accepts the plain JSON shape.
+      CollectionsService.ReorderRequests({
+        items: items.map((item) => ({
+          id: item.id,
+          newFolderId: item.newFolderId ?? undefined,
+          newSortOrder: item.newSortOrder,
+        })),
+      } as any) as Promise<void>,
     deleteRequest: (id: string) =>
       CollectionsService.DeleteRequest({ id }) as Promise<void>,
     renameRequest: (id: string, name: string) =>

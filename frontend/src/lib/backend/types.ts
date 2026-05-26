@@ -1,13 +1,83 @@
-import type { WorkspaceState } from "@/features/workspace/types";
+import type {
+  FileBodyData,
+  FormBodyField,
+  RequestBodyMode,
+  WorkspaceState,
+} from "@/features/workspace/types";
 import type { ResponseCookie } from "@/features/workspace/types/response";
 import type { CollectionTree, Collection, Folder, SavedRequest } from "@/features/collections/types";
+
+export type GraphQLBodyPayload = {
+  query: string;
+  variables: string;
+};
 
 export type HttpRequestPayload = {
   id: string;
   method: string;
   url: string;
   headers: Record<string, string>;
+
+  /**
+   * General body mode. When omitted, the backend treats the request as a
+   * legacy text body driven entirely by `body` (back-compat path).
+   */
+  bodyMode?: RequestBodyMode;
+
+  /**
+   * Pre-encoded textual body. Carries the editor contents for text mode
+   * and the URL-encoded payload for `form` + url-encoded subtype.
+   */
   body?: string;
+
+  /**
+   * `form` mode discriminator: url-encoded vs multipart.
+   */
+  formSubtype?: "application/x-www-form-urlencoded" | "multipart/form-data";
+
+  /**
+   * Structured form rows. Only consumed by the backend when bodyMode is
+   * `form` and formSubtype is `multipart/form-data`.
+   */
+  formFields?: FormBodyField[];
+
+  /**
+   * File reference for `file` body mode. `path` must be an absolute path
+   * on the user's machine — populated via the native open-file dialog.
+   */
+  file?: FileBodyData | null;
+
+  /**
+   * Optional override for the Content-Type header when sending a `file`
+   * body. Defaults to `application/octet-stream` server-side.
+   */
+  fileContentType?: string;
+
+  /**
+   * GraphQL payload — populated when bodyMode is `graphql`. The backend
+   * assembles the canonical `{ query, variables }` JSON envelope.
+   */
+  graphql?: GraphQLBodyPayload | null;
+};
+
+export type FileDialogFilter = {
+  displayName: string;
+  pattern: string;
+};
+
+export type PickFileOptions = {
+  title?: string;
+  defaultDirectory?: string;
+  defaultFilename?: string;
+  filters?: FileDialogFilter[];
+};
+
+export type PickFileResult = {
+  path: string;
+  name: string;
+  size: number;
+  contentType: string;
+  cancelled: boolean;
 };
 
 export type HttpResponsePayload = {

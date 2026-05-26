@@ -69,6 +69,10 @@ func (s *Service) MoveRequest(input api.MoveSavedRequestInput) error {
 	return s.repo.MoveRequest(input)
 }
 
+func (s *Service) ReorderRequests(input api.ReorderSavedRequestsInput) error {
+	return s.repo.ReorderRequests(input)
+}
+
 func (s *Service) DeleteRequest(input api.DeleteEntityInput) error {
 	return s.repo.DeleteRequest(input.ID)
 }

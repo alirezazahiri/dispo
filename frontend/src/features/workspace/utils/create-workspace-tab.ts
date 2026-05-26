@@ -20,7 +20,23 @@ export const createWorkspaceTab = (
 
     url: "",
 
+    bodyMode: "none",
+
     body: "",
+
+    bodyContentType: "application/json",
+
+    formSubtype: "application/x-www-form-urlencoded",
+
+    formFields: [],
+
+    fileContentType: "application/octet-stream",
+
+    fileBody: null,
+
+    graphqlQuery: "",
+
+    graphqlVariables: "",
 
     preRequestScript: "",
 

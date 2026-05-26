@@ -29,6 +29,8 @@ export function RenameFolder(arg1:api.RenameFolderInput):Promise<void>;
 
 export function RenameRequest(arg1:api.RenameRequestInput):Promise<void>;
 
+export function ReorderRequests(arg1:api.ReorderSavedRequestsInput):Promise<void>;
+
 export function SaveRequest(arg1:api.SavedRequestPayload):Promise<api.SavedRequestPayload>;
 
 export function Startup(arg1:context.Context):Promise<void>;

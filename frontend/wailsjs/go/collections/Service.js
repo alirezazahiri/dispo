@@ -54,6 +54,10 @@ export function RenameRequest(arg1) {
   return window['go']['collections']['Service']['RenameRequest'](arg1);
 }
 
+export function ReorderRequests(arg1) {
+  return window['go']['collections']['Service']['ReorderRequests'](arg1);
+}
+
 export function SaveRequest(arg1) {
   return window['go']['collections']['Service']['SaveRequest'](arg1);
 }

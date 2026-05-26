@@ -18,6 +18,7 @@ import {
 import { useActiveEnvironment, useWorkspaceUpdateTab } from "../../stores";
 import type { KeyValuePair, RequestAuthType } from "../../types";
 import { ScriptsTab } from "./scripts-tab";
+import { RequestBodyEditor } from "./request-body-editor";
 
 type Props = {
   tab: RequestTab;
@@ -26,15 +27,9 @@ type Props = {
 export function RequestEditor({ tab }: Props) {
   const updateTab = useWorkspaceUpdateTab();
   const activeEnvironment = useActiveEnvironment();
-  const templateValues = buildTemplateValues(activeEnvironment?.variables ?? []);
-
-  const handleBodyChange = (value: string) => {
-    updateTab(tab.id, {
-      body: value,
-
-      isDirty: true,
-    });
-  };
+  const templateValues = buildTemplateValues(
+    activeEnvironment?.variables ?? [],
+  );
 
   const updateKeyValueRows = (
     rows: KeyValuePair[],
@@ -221,7 +216,6 @@ export function RequestEditor({ tab }: Props) {
             >
               Scripts
             </TabsTrigger>
-
           </TabsList>
         </div>
 
@@ -233,11 +227,7 @@ export function RequestEditor({ tab }: Props) {
           "
         >
           <div className="h-full w-full">
-            <MonacoBaseEditor
-              value={tab.body}
-              onChange={handleBodyChange}
-              defaultLanguage="json"
-            />
+            <RequestBodyEditor tab={tab} />
           </div>
         </TabsContent>
 
@@ -280,7 +270,10 @@ export function RequestEditor({ tab }: Props) {
           <div className="p-4 flex flex-col gap-4 max-w-xl">
             <div className="space-y-2">
               <div className="text-sm font-medium">Auth Type</div>
-              <Select value={tab.auth.type} onValueChange={handleAuthTypeChange}>
+              <Select
+                value={tab.auth.type}
+                onValueChange={handleAuthTypeChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select auth type" />
                 </SelectTrigger>
