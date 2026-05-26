@@ -1,8 +1,8 @@
 import {
   ThemeToggleButton,
   SidebarToggleButton,
-  SettingsButton,
 } from "@/components/shared";
+import { SettingsMenu } from "@/features/settings";
 // import { SearchBar } from "@/features/searchbar";
 
 export function Topbar() {
@@ -31,7 +31,7 @@ export function Topbar() {
       <div className="flex items-center gap-1">
         <ThemeToggleButton />
 
-        <SettingsButton />
+        <SettingsMenu />
       </div>
     </header>
   );
