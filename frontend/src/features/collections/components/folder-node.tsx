@@ -86,7 +86,6 @@ export function FolderNode({
   });
 
   const activeData = active?.data.current as RequestDragData | undefined;
-  console.log("activeData", activeData);
   const isValidDropTarget =
     activeData?.type === "request" &&
     activeData.collectionId === folder.collectionId &&

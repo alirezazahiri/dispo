@@ -77,9 +77,6 @@ export function RequestNode({
     activeData.requestId !== request.id &&
     activeData.collectionId === request.collectionId;
 
-  console.log("isValidDropTarget", isValidDropTarget);
-  console.log("activeData", activeData);
-
   return (
     <div
       ref={setSortableRef}

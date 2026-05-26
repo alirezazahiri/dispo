@@ -10,6 +10,10 @@ export function LoadWorkspaceState() {
   return window['go']['httpservice']['HTTPService']['LoadWorkspaceState']();
 }
 
+export function PickFile(arg1) {
+  return window['go']['httpservice']['HTTPService']['PickFile'](arg1);
+}
+
 export function SaveWorkspaceState(arg1) {
   return window['go']['httpservice']['HTTPService']['SaveWorkspaceState'](arg1);
 }

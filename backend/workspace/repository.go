@@ -167,6 +167,17 @@ func (r *Repository) initSchema() error {
 	); err != nil {
 		return err
 	}
+	// body_meta_json carries the structured "extras" introduced when the
+	// request body editor gained general modes (none/form/file/graphql).
+	// The legacy `body` column keeps holding the textual payload so older
+	// installs continue to surface their JSON/XML/text bodies.
+	if err := r.ensureColumnExists(
+		"request_tabs",
+		"body_meta_json",
+		`ALTER TABLE request_tabs ADD COLUMN body_meta_json TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return err
+	}
 	if err := r.ensureColumnExists(
 		"workspace_meta",
 		"tab_order_by_collection_json",
@@ -244,10 +255,15 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 			return fmt.Errorf("marshal response for tab %s: %w", tab.ID, marshalErr)
 		}
 
+		bodyMetaJSON, marshalErr := api.MarshalBodyMeta(bodyMetaFromTab(tab))
+		if marshalErr != nil {
+			return fmt.Errorf("marshal body meta for tab %s: %w", tab.ID, marshalErr)
+		}
+
 		if _, err = tx.Exec(
 			`INSERT INTO request_tabs (
-				id, collection_id, saved_request_id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, collection_id, saved_request_id, layout, protocol, title, method, url, body, body_meta_json, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			tab.ID,
 			tab.CollectionID,
 			tab.SavedRequestID,
@@ -257,6 +273,7 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 			tab.Method,
 			tab.URL,
 			tab.Body,
+			bodyMetaJSON,
 			tab.Auth.Type,
 			tab.Auth.BearerToken,
 			tab.PreRequestScript,
@@ -369,7 +386,7 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 	_ = activeTabID
 
 	tabsRows, err := r.db.Query(`
-		SELECT id, collection_id, saved_request_id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+		SELECT id, collection_id, saved_request_id, layout, protocol, title, method, url, body, body_meta_json, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
 		FROM request_tabs
 		ORDER BY created_at ASC
 	`)
@@ -382,6 +399,7 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 	for tabsRows.Next() {
 		var tab api.RequestTabPayload
 		var responseJSON string
+		var bodyMetaJSON string
 		if err := tabsRows.Scan(
 			&tab.ID,
 			&tab.CollectionID,
@@ -392,6 +410,7 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 			&tab.Method,
 			&tab.URL,
 			&tab.Body,
+			&bodyMetaJSON,
 			&tab.Auth.Type,
 			&tab.Auth.BearerToken,
 			&tab.PreRequestScript,
@@ -408,6 +427,12 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 			return state, fmt.Errorf("unmarshal response for tab %s: %w", tab.ID, unmarshalErr)
 		}
 		tab.Response = response
+
+		meta, unmarshalErr := api.UnmarshalBodyMeta(bodyMetaJSON)
+		if unmarshalErr != nil {
+			return state, fmt.Errorf("unmarshal body meta for tab %s: %w", tab.ID, unmarshalErr)
+		}
+		applyBodyMetaToTab(&tab, meta)
 
 		headers, err := r.loadKeyValueRows("request_headers", tab.ID)
 		if err != nil {
@@ -568,6 +593,7 @@ func (r *Repository) ensureRequestTabsForeignKeys() error {
 			method TEXT NOT NULL,
 			url TEXT NOT NULL,
 			body TEXT NOT NULL,
+			body_meta_json TEXT NOT NULL DEFAULT '',
 			auth_type TEXT NOT NULL DEFAULT 'none',
 			bearer_token TEXT NOT NULL DEFAULT '',
 			pre_request_script TEXT NOT NULL DEFAULT '',
@@ -584,7 +610,7 @@ func (r *Repository) ensureRequestTabsForeignKeys() error {
 
 	if _, err = tx.Exec(`
 		INSERT INTO request_tabs_new (
-			id, collection_id, saved_request_id, layout, protocol, title, method, url, body, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
+			id, collection_id, saved_request_id, layout, protocol, title, method, url, body, body_meta_json, auth_type, bearer_token, pre_request_script, post_response_script, response_json, created_at, updated_at
 		)
 		SELECT
 			request_tabs.id,
@@ -599,6 +625,7 @@ func (r *Repository) ensureRequestTabsForeignKeys() error {
 			request_tabs.method,
 			request_tabs.url,
 			request_tabs.body,
+			COALESCE(request_tabs.body_meta_json, ''),
 			request_tabs.auth_type,
 			request_tabs.bearer_token,
 			request_tabs.pre_request_script,
@@ -689,6 +716,62 @@ func boolToInt(value bool) int {
 	}
 
 	return 0
+}
+
+// bodyMetaFromTab extracts the non-legacy body fields from a tab so they
+// can be serialised into the `body_meta_json` SQLite column.
+func bodyMetaFromTab(tab api.RequestTabPayload) api.BodyMetaPayload {
+	return api.BodyMetaPayload{
+		BodyMode:         tab.BodyMode,
+		BodyContentType:  tab.BodyContentType,
+		FormSubtype:      tab.FormSubtype,
+		FormFields:       tab.FormFields,
+		FileContentType:  tab.FileContentType,
+		FileBody:         tab.FileBody,
+		GraphQLQuery:     tab.GraphQLQuery,
+		GraphQLVariables: tab.GraphQLVariables,
+	}
+}
+
+// applyBodyMetaToTab repopulates a tab's structured body fields from a
+// previously persisted meta blob. Legacy rows (empty meta) get a
+// sensible body mode derived from whether they had any textual body.
+func applyBodyMetaToTab(tab *api.RequestTabPayload, meta api.BodyMetaPayload) {
+	tab.BodyMode = meta.BodyMode
+	tab.BodyContentType = meta.BodyContentType
+	tab.FormSubtype = meta.FormSubtype
+	tab.FormFields = ensureFormFields(meta.FormFields)
+	tab.FileContentType = meta.FileContentType
+	tab.FileBody = meta.FileBody
+	tab.GraphQLQuery = meta.GraphQLQuery
+	tab.GraphQLVariables = meta.GraphQLVariables
+
+	if tab.BodyMode == "" {
+		if tab.Body != "" {
+			tab.BodyMode = api.BodyModeText
+		} else {
+			tab.BodyMode = api.BodyModeNone
+		}
+	}
+	if tab.BodyContentType == "" {
+		tab.BodyContentType = "application/json"
+	}
+	if tab.FormSubtype == "" {
+		tab.FormSubtype = api.FormSubtypeURLEncoded
+	}
+	if tab.FileContentType == "" {
+		tab.FileContentType = "application/octet-stream"
+	}
+}
+
+// ensureFormFields normalises a nil slice into an empty slice so the
+// JSON response always carries `[]` rather than `null`. The frontend
+// expects a real array it can `.map` over.
+func ensureFormFields(fields []api.FormBodyFieldPayload) []api.FormBodyFieldPayload {
+	if fields == nil {
+		return []api.FormBodyFieldPayload{}
+	}
+	return fields
 }
 
 func marshalResponse(response map[string]any) (string, error) {

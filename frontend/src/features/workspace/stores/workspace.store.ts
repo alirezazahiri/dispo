@@ -135,11 +135,23 @@ function sanitizeState(
   state: Partial<WorkspaceState> | null | undefined,
 ): WorkspaceState {
   const incomingTabs = state?.tabs ?? [];
-  const sourceTabs = incomingTabs.map((tab) => ({
-    ...tab,
-    collectionId: tab.collectionId || "",
-    savedRequestId: tab.savedRequestId ?? null,
-  }));
+  const sourceTabs = incomingTabs.map((tab) => {
+    const template = createWorkspaceTab(tab.protocol ?? "http", tab.collectionId);
+    return {
+      ...template,
+      ...tab,
+      collectionId: tab.collectionId || "",
+      savedRequestId: tab.savedRequestId ?? null,
+      bodyMode: tab.bodyMode ?? template.bodyMode,
+      bodyContentType: tab.bodyContentType ?? template.bodyContentType,
+      formSubtype: tab.formSubtype ?? template.formSubtype,
+      formFields: tab.formFields ?? template.formFields,
+      fileContentType: tab.fileContentType ?? template.fileContentType,
+      fileBody: tab.fileBody ?? template.fileBody,
+      graphqlQuery: tab.graphqlQuery ?? template.graphqlQuery,
+      graphqlVariables: tab.graphqlVariables ?? template.graphqlVariables,
+    };
+  });
 
   const tabOrderByCollection = reconcileTabOrder(
     sourceTabs,
@@ -444,6 +456,18 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
       tab.method = savedRequest.method;
       tab.url = savedRequest.url;
       tab.body = savedRequest.body;
+      tab.bodyMode =
+        savedRequest.bodyMode ?? (savedRequest.body ? "text" : "none");
+      tab.bodyContentType =
+        savedRequest.bodyContentType ?? tab.bodyContentType;
+      tab.formSubtype = savedRequest.formSubtype ?? tab.formSubtype;
+      tab.formFields = savedRequest.formFields ?? tab.formFields;
+      tab.fileContentType =
+        savedRequest.fileContentType ?? tab.fileContentType;
+      tab.fileBody = savedRequest.fileBody ?? tab.fileBody;
+      tab.graphqlQuery = savedRequest.graphqlQuery ?? tab.graphqlQuery;
+      tab.graphqlVariables =
+        savedRequest.graphqlVariables ?? tab.graphqlVariables;
       tab.preRequestScript = savedRequest.preRequestScript;
       tab.postResponseScript = savedRequest.postResponseScript;
       tab.headers = savedRequest.headers;
@@ -503,7 +527,15 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         name: options?.name ?? canonicalTitle,
         method: tab.method,
         url: tab.url,
+        bodyMode: tab.bodyMode,
         body: tab.body,
+        bodyContentType: tab.bodyContentType,
+        formSubtype: tab.formSubtype,
+        formFields: tab.formFields,
+        fileContentType: tab.fileContentType,
+        fileBody: tab.fileBody,
+        graphqlQuery: tab.graphqlQuery,
+        graphqlVariables: tab.graphqlVariables,
         preRequestScript: tab.preRequestScript,
         postResponseScript: tab.postResponseScript,
         headers: tab.headers,

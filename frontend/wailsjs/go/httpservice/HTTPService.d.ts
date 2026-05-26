@@ -7,6 +7,8 @@ export function Close():Promise<void>;
 
 export function LoadWorkspaceState():Promise<api.WorkspaceStatePayload>;
 
+export function PickFile(arg1:api.PickFileOptions):Promise<api.PickFileResult>;
+
 export function SaveWorkspaceState(arg1:api.WorkspaceStatePayload):Promise<void>;
 
 export function SendHttpRequest(arg1:api.HttpRequestPayload):Promise<api.HttpResponsePayload>;

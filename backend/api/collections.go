@@ -20,21 +20,29 @@ type FolderPayload struct {
 }
 
 type SavedRequestPayload struct {
-	ID                 string             `json:"id"`
-	CollectionID       string             `json:"collectionId"`
-	FolderID           *string            `json:"folderId,omitempty"`
-	Name               string             `json:"name"`
-	Method             string             `json:"method"`
-	URL                string             `json:"url"`
-	Body               string             `json:"body"`
-	PreRequestScript   string             `json:"preRequestScript"`
-	PostResponseScript string             `json:"postResponseScript"`
-	Headers            []KeyValuePayload  `json:"headers"`
-	QueryParams        []KeyValuePayload  `json:"queryParams"`
-	Auth               RequestAuthPayload `json:"auth"`
-	SortOrder          int                `json:"sortOrder"`
-	CreatedAt          int64              `json:"createdAt"`
-	UpdatedAt          int64              `json:"updatedAt"`
+	ID                 string                 `json:"id"`
+	CollectionID       string                 `json:"collectionId"`
+	FolderID           *string                `json:"folderId,omitempty"`
+	Name               string                 `json:"name"`
+	Method             string                 `json:"method"`
+	URL                string                 `json:"url"`
+	BodyMode           string                 `json:"bodyMode"`
+	Body               string                 `json:"body"`
+	BodyContentType    string                 `json:"bodyContentType"`
+	FormSubtype        string                 `json:"formSubtype"`
+	FormFields         []FormBodyFieldPayload `json:"formFields"`
+	FileContentType    string                 `json:"fileContentType"`
+	FileBody           *FileBodyPayload       `json:"fileBody,omitempty"`
+	GraphQLQuery       string                 `json:"graphqlQuery"`
+	GraphQLVariables   string                 `json:"graphqlVariables"`
+	PreRequestScript   string                 `json:"preRequestScript"`
+	PostResponseScript string                 `json:"postResponseScript"`
+	Headers            []KeyValuePayload      `json:"headers"`
+	QueryParams        []KeyValuePayload      `json:"queryParams"`
+	Auth               RequestAuthPayload     `json:"auth"`
+	SortOrder          int                    `json:"sortOrder"`
+	CreatedAt          int64                  `json:"createdAt"`
+	UpdatedAt          int64                  `json:"updatedAt"`
 }
 
 type CollectionTreePayload struct {
