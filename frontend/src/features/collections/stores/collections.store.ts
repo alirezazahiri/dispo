@@ -324,6 +324,7 @@ export const useCollectionsStore = create<CollectionsStore>()(
           postResponseScript: "",
           headers: [],
           queryParams: [],
+          pathParams: [],
           auth: { type: "none", bearerToken: "" },
           sortOrder: -1,
           createdAt: 0,

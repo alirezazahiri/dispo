@@ -91,6 +91,7 @@ type RequestTabPayload struct {
 	PostResponseScript string                 `json:"postResponseScript"`
 	Headers            []KeyValuePayload      `json:"headers"`
 	QueryParams        []KeyValuePayload      `json:"queryParams"`
+	PathParams         []KeyValuePayload      `json:"pathParams"`
 	Auth               RequestAuthPayload     `json:"auth"`
 	Response           map[string]any         `json:"response,omitempty"`
 	CreatedAt          int64                  `json:"createdAt"`

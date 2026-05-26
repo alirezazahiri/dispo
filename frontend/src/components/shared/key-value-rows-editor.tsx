@@ -39,9 +39,9 @@ export function KeyValueRowsEditor({
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="p-4">
         <div className="min-w-[640px] space-y-2">
-          <div className="grid grid-cols-[80px_1fr_1fr_48px] gap-2 text-xs text-muted-foreground px-2">
+          <div className="grid grid-cols-[80px_1fr_1fr_48px] gap-2 text-xs text-muted-foreground">
             <div>Enabled</div>
             <div>Key</div>
             <div>Value</div>

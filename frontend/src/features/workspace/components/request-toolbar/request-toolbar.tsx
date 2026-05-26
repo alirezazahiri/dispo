@@ -25,7 +25,10 @@ import {
   resolveTemplate,
   appendQueryParams,
   buildRequestSnapshot,
+  reconcilePathParamRows,
+  substitutePathParams,
 } from "./utils";
+import { nanoid } from "nanoid";
 import {
   applyEnvironmentMutations,
   runPostResponseScript,
@@ -46,6 +49,21 @@ export function RequestToolbar({ tab }: Props) {
   const saveTabToCollection = useWorkspaceSaveTabToCollection();
   const upsertRequest = useCollectionsStore((state) => state.upsertRequest);
   const templateValues = createVariableMap(activeEnvironment?.variables ?? []);
+
+  // Mirrors the keys/values of the tab's path params for the URL highlighter
+  // and autocomplete popover. Disabled and empty rows are filtered out so
+  // the popover doesn't surface "blank suggestions" the user can't act on.
+  const pathParamValues = (tab.pathParams ?? []).reduce<Record<string, string>>(
+    (acc, row) => {
+      const key = row.key.trim();
+      if (!key || !row.enabled) {
+        return acc;
+      }
+      acc[key] = row.value;
+      return acc;
+    },
+    {},
+  );
 
   const { mutateAsync: sendHttpRequest, isPending } = useSendHttpRequest();
 
@@ -95,6 +113,19 @@ export function RequestToolbar({ tab }: Props) {
   };
 
   const handleUrlChange = (url: string) => {
+    // Walk the URL for `:name` placeholders and reconcile Path Param
+    // rows: add rows for new placeholders, drop auto-added empty rows
+    // for placeholders that just disappeared (so we don't accumulate
+    // stale rows while the user types `:u` → `:us` → `:userId`).
+    const previousRows = tab.pathParams ?? [];
+    const nextPathParams = reconcilePathParamRows(
+      url,
+      tab.url,
+      previousRows,
+      () => nanoid(),
+    );
+    const pathParamsChanged = nextPathParams !== previousRows;
+
     updateTab(tab.id, {
       url,
       title:
@@ -105,6 +136,8 @@ export function RequestToolbar({ tab }: Props) {
           : tab.title,
 
       isDirty: true,
+
+      ...(pathParamsChanged ? { pathParams: nextPathParams } : null),
     });
   };
 
@@ -174,9 +207,28 @@ export function RequestToolbar({ tab }: Props) {
 
       const variableMap = createVariableMap(latestEnvironment?.variables ?? []);
       const unresolvedVariables = new Set<string>();
+      const unresolvedPathParams = new Set<string>();
       const requestState = preResult.request;
 
-      const url = resolveTemplate(requestState.url, variableMap, unresolvedVariables);
+      // Resolve `{{var}}` first so a path-param value of e.g. `{{userId}}`
+      // is expanded against the environment before we splice it into the
+      // URL. Then substitute `:name` placeholders against the tab's path
+      // params (their own values are also `{{var}}`-resolved).
+      const urlWithEnv = resolveTemplate(
+        requestState.url,
+        variableMap,
+        unresolvedVariables,
+      );
+      const resolvedPathParamRows = (tab.pathParams ?? []).map((row) => ({
+        key: row.key,
+        value: resolveTemplate(row.value, variableMap, unresolvedVariables),
+        enabled: row.enabled,
+      }));
+      const url = substitutePathParams(
+        urlWithEnv,
+        resolvedPathParamRows,
+        unresolvedPathParams,
+      );
       const body = resolveTemplate(requestState.body, variableMap, unresolvedVariables);
 
       const resolvedQueryParams = Object.entries(requestState.params)
@@ -219,6 +271,12 @@ export function RequestToolbar({ tab }: Props) {
       if (unresolvedVariables.size) {
         toast.warning(
           `Unresolved variables: ${Array.from(unresolvedVariables).join(", ")}`,
+        );
+      }
+
+      if (unresolvedPathParams.size) {
+        toast.warning(
+          `Unresolved path params: ${Array.from(unresolvedPathParams).join(", ")}`,
         );
       }
 
@@ -378,6 +436,7 @@ export function RequestToolbar({ tab }: Props) {
         value={tab.url}
         onChange={handleUrlChange}
         templateValues={templateValues}
+        pathParamValues={pathParamValues}
       />
 
       <EnvironmentSelect

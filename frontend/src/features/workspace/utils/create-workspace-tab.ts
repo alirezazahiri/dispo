@@ -46,6 +46,8 @@ export const createWorkspaceTab = (
 
     queryParams: [],
 
+    pathParams: [],
+
     auth: {
       type: "none",
       bearerToken: "",

@@ -120,6 +120,7 @@ export namespace api {
 	    postResponseScript: string;
 	    headers: KeyValuePayload[];
 	    queryParams: KeyValuePayload[];
+	    pathParams: KeyValuePayload[];
 	    auth: RequestAuthPayload;
 	    sortOrder: number;
 	    createdAt: number;
@@ -150,6 +151,7 @@ export namespace api {
 	        this.postResponseScript = source["postResponseScript"];
 	        this.headers = this.convertValues(source["headers"], KeyValuePayload);
 	        this.queryParams = this.convertValues(source["queryParams"], KeyValuePayload);
+	        this.pathParams = this.convertValues(source["pathParams"], KeyValuePayload);
 	        this.auth = this.convertValues(source["auth"], RequestAuthPayload);
 	        this.sortOrder = source["sortOrder"];
 	        this.createdAt = source["createdAt"];
@@ -657,6 +659,7 @@ export namespace api {
 	    postResponseScript: string;
 	    headers: KeyValuePayload[];
 	    queryParams: KeyValuePayload[];
+	    pathParams: KeyValuePayload[];
 	    auth: RequestAuthPayload;
 	    response?: Record<string, any>;
 	    createdAt: number;
@@ -689,6 +692,7 @@ export namespace api {
 	        this.postResponseScript = source["postResponseScript"];
 	        this.headers = this.convertValues(source["headers"], KeyValuePayload);
 	        this.queryParams = this.convertValues(source["queryParams"], KeyValuePayload);
+	        this.pathParams = this.convertValues(source["pathParams"], KeyValuePayload);
 	        this.auth = this.convertValues(source["auth"], RequestAuthPayload);
 	        this.response = source["response"];
 	        this.createdAt = source["createdAt"];

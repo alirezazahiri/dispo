@@ -109,6 +109,15 @@ func (r *Repository) initSchema() error {
 			enabled INTEGER NOT NULL,
 			FOREIGN KEY(tab_id) REFERENCES request_tabs(id) ON DELETE CASCADE
 		)`,
+		`CREATE TABLE IF NOT EXISTS request_path_params (
+			id TEXT PRIMARY KEY,
+			tab_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			key_name TEXT NOT NULL,
+			value TEXT NOT NULL,
+			enabled INTEGER NOT NULL,
+			FOREIGN KEY(tab_id) REFERENCES request_tabs(id) ON DELETE CASCADE
+		)`,
 		`CREATE TABLE IF NOT EXISTS environments (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -239,6 +248,9 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 	if _, err = tx.Exec(`DELETE FROM request_params`); err != nil {
 		return fmt.Errorf("clear params: %w", err)
 	}
+	if _, err = tx.Exec(`DELETE FROM request_path_params`); err != nil {
+		return fmt.Errorf("clear path params: %w", err)
+	}
 	if _, err = tx.Exec(`DELETE FROM request_tabs`); err != nil {
 		return fmt.Errorf("clear tabs: %w", err)
 	}
@@ -310,6 +322,20 @@ func (r *Repository) SaveState(state api.WorkspaceStatePayload) error {
 				boolToInt(param.Enabled),
 			); err != nil {
 				return fmt.Errorf("insert param %s: %w", param.ID, err)
+			}
+		}
+
+		for index, param := range tab.PathParams {
+			if _, err = tx.Exec(
+				`INSERT INTO request_path_params (id, tab_id, position, key_name, value, enabled) VALUES (?, ?, ?, ?, ?, ?)`,
+				param.ID,
+				tab.ID,
+				index,
+				param.Key,
+				param.Value,
+				boolToInt(param.Enabled),
+			); err != nil {
+				return fmt.Errorf("insert path param %s: %w", param.ID, err)
 			}
 		}
 	}
@@ -442,9 +468,14 @@ func (r *Repository) LoadState() (api.WorkspaceStatePayload, error) {
 		if err != nil {
 			return state, fmt.Errorf("load params for tab %s: %w", tab.ID, err)
 		}
+		pathParams, err := r.loadKeyValueRows("request_path_params", tab.ID)
+		if err != nil {
+			return state, fmt.Errorf("load path params for tab %s: %w", tab.ID, err)
+		}
 
 		tab.Headers = headers
 		tab.QueryParams = params
+		tab.PathParams = pathParams
 		tabs = append(tabs, tab)
 	}
 
@@ -701,7 +732,7 @@ func (r *Repository) ensureColumnExists(
 
 func mapTableToForeignColumn(table string) string {
 	switch table {
-	case "request_headers", "request_params":
+	case "request_headers", "request_params", "request_path_params":
 		return "tab_id"
 	case "environment_variables":
 		return "environment_id"

@@ -73,6 +73,11 @@ export type SavedRequest = {
   postResponseScript: string;
   headers: KeyValuePair[];
   queryParams: KeyValuePair[];
+  /**
+   * Path parameters keyed by the `:name` placeholders in `url`.
+   * Mirrors `RequestTab.pathParams`.
+   */
+  pathParams: KeyValuePair[];
   auth: RequestAuth;
   sortOrder: number;
   createdAt: number;

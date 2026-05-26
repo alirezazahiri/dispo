@@ -26,11 +26,23 @@ type Props = {
   className?: string;
   previewLabel?: string;
   templateValues?: Record<string, string>;
+  /**
+   * When provided (even as an empty object), `:name` placeholders that
+   * follow `/` (or the very start of the input) are highlighted as path
+   * params and become typeable through the autocomplete popover.
+   *
+   * Pass `undefined` to disable the path-param feature entirely — used
+   * by inputs that aren't request URLs (e.g. the bearer-token field).
+   */
+  pathParamValues?: Record<string, string>;
 };
 
 const TEMPLATE_REGEX = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
 const VARIABLE_NAME_REGEX = /^[A-Za-z0-9_.-]*$/;
 const TRAILING_VARIABLE_REGEX = /^[A-Za-z0-9_.-]*\s*\}\}/;
+
+const PATH_PARAM_NAME_REGEX = /^[A-Za-z0-9_]*$/;
+const TRAILING_PATH_PARAM_REGEX = /^[A-Za-z0-9_]*/;
 
 type Palette = {
   text: string;
@@ -73,18 +85,37 @@ const MISSING_TEMPLATE_PALETTE: Palette = {
   cardDot: "bg-red-400",
 };
 
+// Path params get a dedicated amber palette so they read as a different
+// kind of token from `{{var}}` at a glance. We deliberately reuse the
+// shared "missing" palette for the unresolved state — red consistently
+// means "this token won't be substituted at send time".
+const PATH_PARAM_PALETTE: Palette = {
+  text: "text-amber-700 dark:text-amber-300",
+  bg: "bg-amber-500/15 dark:bg-amber-400/15",
+  cardAccent: "border-amber-500/30",
+  cardDot: "bg-amber-400",
+};
+
+type AutocompleteKind = "template" | "pathParam";
+
 type AutocompleteState = {
   open: boolean;
+  kind: AutocompleteKind;
   query: string;
-  templateStart: number;
+  /**
+   * Index of the trigger character(s) in the input value. For templates
+   * this is the `{` of `{{`, for path params it is the `:`.
+   */
+  tokenStart: number;
   caret: number;
   selectedIndex: number;
 };
 
 const INITIAL_AUTOCOMPLETE_STATE: AutocompleteState = {
   open: false,
+  kind: "template",
   query: "",
-  templateStart: -1,
+  tokenStart: -1,
   caret: 0,
   selectedIndex: 0,
 };
@@ -96,6 +127,7 @@ export function TemplateHighlightInput({
   className,
   previewLabel = "Template variable",
   templateValues = {},
+  pathParamValues,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -107,8 +139,13 @@ export function TemplateHighlightInput({
   );
   const [anchorOffset, setAnchorOffset] = useState(0);
 
-  const segments = useMemo(() => splitTemplateSegments(value), [value]);
-  const hasTemplates = segments.some((segment) => segment.type === "template");
+  const pathParamsEnabled = pathParamValues !== undefined;
+
+  const segments = useMemo(
+    () => splitSegments(value, pathParamsEnabled),
+    [value, pathParamsEnabled],
+  );
+  const hasTokens = segments.some((segment) => segment.type !== "text");
 
   const templateKeys = useMemo(
     () =>
@@ -118,17 +155,36 @@ export function TemplateHighlightInput({
     [templateValues],
   );
 
+  const pathParamKeys = useMemo(
+    () =>
+      pathParamValues
+        ? Object.keys(pathParamValues).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" }),
+          )
+        : [],
+    [pathParamValues],
+  );
+
+  const suggestionPool =
+    autocomplete.kind === "pathParam" ? pathParamKeys : templateKeys;
+  const suggestionPalette =
+    autocomplete.kind === "pathParam" ? PATH_PARAM_PALETTE : null;
+  const suggestionHeader =
+    autocomplete.kind === "pathParam"
+      ? "Path parameters"
+      : "Environment variables";
+
   const suggestions = useMemo(() => {
     if (!autocomplete.open) {
       return [] as string[];
     }
     const query = autocomplete.query.toLowerCase();
     if (!query) {
-      return templateKeys;
+      return suggestionPool;
     }
     const startsWith: string[] = [];
     const contains: string[] = [];
-    for (const key of templateKeys) {
+    for (const key of suggestionPool) {
       const lowerKey = key.toLowerCase();
       if (lowerKey.startsWith(query)) {
         startsWith.push(key);
@@ -137,10 +193,10 @@ export function TemplateHighlightInput({
       }
     }
     return [...startsWith, ...contains];
-  }, [autocomplete.open, autocomplete.query, templateKeys]);
+  }, [autocomplete.open, autocomplete.query, suggestionPool]);
 
   const isAutocompleteVisible =
-    autocomplete.open && suggestions.length > 0 && templateKeys.length > 0;
+    autocomplete.open && suggestions.length > 0 && suggestionPool.length > 0;
 
   const syncScroll = useCallback(() => {
     const input = inputRef.current;
@@ -169,43 +225,74 @@ export function TemplateHighlightInput({
   const detectAutocomplete = useCallback(() => {
     const input = inputRef.current;
     if (!input) return;
-    if (templateKeys.length === 0) {
+
+    // Only ever open the popover while the user is actively interacting
+    // with the input. Without this guard the value-change effect below
+    // would run on mount (and on every programmatic `value` update — tab
+    // switches, store rehydration, etc.) and `input.selectionStart` on
+    // an unfocused input is unreliable across browsers: it can fall back
+    // to the end of the string, which makes a saved URL like
+    // `/users/:userId` flash the path-param popover unprompted.
+    if (typeof document !== "undefined" && document.activeElement !== input) {
       closeAutocomplete();
       return;
     }
 
     const caret = input.selectionStart ?? input.value.length;
     const before = input.value.slice(0, caret);
-    const lastOpen = before.lastIndexOf("{{");
 
-    if (lastOpen === -1) {
+    const templateTrigger = detectTemplateTrigger(before);
+    const pathParamTrigger = pathParamsEnabled
+      ? detectPathParamTrigger(before)
+      : null;
+
+    // When both triggers are technically active (e.g. user is editing a
+    // path-param name that lives inside a templated section), prefer the
+    // one closer to the caret — that's what the user is currently typing.
+    const trigger =
+      templateTrigger && pathParamTrigger
+        ? templateTrigger.tokenStart >= pathParamTrigger.tokenStart
+          ? templateTrigger
+          : pathParamTrigger
+        : (templateTrigger ?? pathParamTrigger);
+
+    if (!trigger) {
       closeAutocomplete();
       return;
     }
 
-    const between = before.slice(lastOpen + 2);
-    if (between.includes("}}")) {
+    if (trigger.kind === "template" && templateKeys.length === 0) {
       closeAutocomplete();
       return;
     }
-
-    const query = between.trim();
-    if (!VARIABLE_NAME_REGEX.test(query)) {
+    if (trigger.kind === "pathParam" && pathParamKeys.length === 0) {
+      // Even with no existing path params the user can keep typing — just
+      // hide the popover so it doesn't flash an empty list. Highlighting
+      // still works because it doesn't depend on the popover being open.
       closeAutocomplete();
       return;
     }
 
     setAutocomplete((prev) => {
-      const sameTemplate = prev.templateStart === lastOpen && prev.open;
+      const sameTrigger =
+        prev.open &&
+        prev.kind === trigger.kind &&
+        prev.tokenStart === trigger.tokenStart;
       return {
         open: true,
-        query,
-        templateStart: lastOpen,
+        kind: trigger.kind,
+        query: trigger.query,
+        tokenStart: trigger.tokenStart,
         caret,
-        selectedIndex: sameTemplate ? prev.selectedIndex : 0,
+        selectedIndex: sameTrigger ? prev.selectedIndex : 0,
       };
     });
-  }, [closeAutocomplete, templateKeys.length]);
+  }, [
+    closeAutocomplete,
+    pathParamsEnabled,
+    templateKeys.length,
+    pathParamKeys.length,
+  ]);
 
   useEffect(() => {
     detectAutocomplete();
@@ -230,8 +317,8 @@ export function TemplateHighlightInput({
   const recomputeAnchor = useCallback(() => {
     const input = inputRef.current;
     if (!input) return;
-    if (autocomplete.templateStart < 0) return;
-    const textBefore = input.value.slice(0, autocomplete.templateStart);
+    if (autocomplete.tokenStart < 0) return;
+    const textBefore = input.value.slice(0, autocomplete.tokenStart);
     const measured = measureInputTextWidth(input, textBefore);
     const paddingLeft = parseFloat(
       window.getComputedStyle(input).paddingLeft || "0",
@@ -239,7 +326,7 @@ export function TemplateHighlightInput({
     const rawX = paddingLeft + measured - input.scrollLeft;
     const maxX = input.clientWidth - 8;
     setAnchorOffset(Math.max(0, Math.min(rawX, maxX)));
-  }, [autocomplete.templateStart]);
+  }, [autocomplete.tokenStart]);
 
   useLayoutEffect(() => {
     if (!isAutocompleteVisible) return;
@@ -250,18 +337,30 @@ export function TemplateHighlightInput({
     (name: string) => {
       const input = inputRef.current;
       if (!input) return;
-      const start = autocomplete.templateStart;
+      const start = autocomplete.tokenStart;
       const caret = input.selectionStart ?? autocomplete.caret;
       if (start === -1) return;
 
       const currentValue = input.value;
       const after = currentValue.slice(caret);
-      const trailingMatch = after.match(TRAILING_VARIABLE_REGEX);
-      const endOfReplacement = trailingMatch
-        ? caret + trailingMatch[0].length
-        : caret;
 
-      const replacement = `{{${name}}}`;
+      let replacement: string;
+      let endOfReplacement: number;
+
+      if (autocomplete.kind === "template") {
+        const trailingMatch = after.match(TRAILING_VARIABLE_REGEX);
+        endOfReplacement = trailingMatch
+          ? caret + trailingMatch[0].length
+          : caret;
+        replacement = `{{${name}}}`;
+      } else {
+        const trailingMatch = after.match(TRAILING_PATH_PARAM_REGEX);
+        endOfReplacement = trailingMatch
+          ? caret + trailingMatch[0].length
+          : caret;
+        replacement = `:${name}`;
+      }
+
       const newValue =
         currentValue.slice(0, start) +
         replacement +
@@ -288,7 +387,12 @@ export function TemplateHighlightInput({
         }
       });
     },
-    [autocomplete.templateStart, autocomplete.caret, onChange],
+    [
+      autocomplete.tokenStart,
+      autocomplete.caret,
+      autocomplete.kind,
+      onChange,
+    ],
   );
 
   const handleInputKeyDown = useCallback(
@@ -418,7 +522,7 @@ export function TemplateHighlightInput({
           />
         </PopoverAnchor>
 
-        {hasTemplates ? (
+        {hasTokens ? (
           <div
             ref={overlayRef}
             className="
@@ -444,84 +548,49 @@ export function TemplateHighlightInput({
                   );
                 }
 
-                const isFound = hasTemplateValue(
-                  segment.name,
-                  templateValues,
-                );
+                if (segment.type === "template") {
+                  const isFound = hasOwn(templateValues, segment.name);
+                  const palette = isFound
+                    ? TEMPLATE_COLORS[segment.colorIndex]
+                    : MISSING_TEMPLATE_PALETTE;
+                  return renderTokenWithCard({
+                    key: `v-${segment.startIndex}`,
+                    palette,
+                    label: previewLabel,
+                    name: segment.name,
+                    valueText: isFound
+                      ? templateValues[segment.name]
+                      : "not found",
+                    valueIsMissing: !isFound,
+                    content: segment.content,
+                    startIndex: segment.startIndex,
+                    onMouseDown: handleTokenMouseDown,
+                    onDoubleClick: handleTokenDoubleClick,
+                  });
+                }
+
+                // segment.type === "pathParam"
+                const value = pathParamValues?.[segment.name];
+                const isFound = value !== undefined && value !== "";
                 const palette = isFound
-                  ? TEMPLATE_COLORS[segment.colorIndex]
+                  ? PATH_PARAM_PALETTE
                   : MISSING_TEMPLATE_PALETTE;
-
-                const tokenNode = (
-                  <span
-                    className={cn(
-                      "pointer-events-auto cursor-text whitespace-pre rounded-sm align-baseline",
-                      "transition-colors",
-                      palette.text,
-                      palette.bg,
-                    )}
-                    onMouseDown={(event) =>
-                      handleTokenMouseDown(
-                        event,
-                        segment.startIndex,
-                        segment.content.length,
-                      )
-                    }
-                    onDoubleClick={(event) =>
-                      handleTokenDoubleClick(
-                        event,
-                        segment.startIndex,
-                        segment.content.length,
-                      )
-                    }
-                  >
-                    {segment.content}
-                  </span>
-                );
-
-                return (
-                  <HoverCard
-                    key={`v-${segment.startIndex}`}
-                    openDelay={120}
-                    closeDelay={80}
-                  >
-                    <HoverCardTrigger asChild>{tokenNode}</HoverCardTrigger>
-
-                    <HoverCardContent
-                      align="start"
-                      sideOffset={8}
-                      className={cn(
-                        "min-w-[220px] w-auto rounded-md border bg-popover p-2 shadow-lg",
-                        palette.cardAccent,
-                      )}
-                    >
-                      <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {previewLabel}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span
-                          className={cn(
-                            "h-2 w-2 rounded-full",
-                            palette.cardDot,
-                          )}
-                        />
-                        <code className="font-mono text-foreground">
-                          {segment.name}
-                        </code>
-                      </div>
-                      <div
-                        className={cn(
-                          "mt-1 break-all text-[11px] font-mono",
-                          isFound
-                            ? "text-muted-foreground"
-                            : "text-red-500 dark:text-red-300",
-                        )}
-                      >
-                        {isFound ? templateValues[segment.name] : "not found"}
-                      </div>
-                    </HoverCardContent>
-                  </HoverCard>
-                );
+                return renderTokenWithCard({
+                  key: `p-${segment.startIndex}`,
+                  palette,
+                  label: "Path parameter",
+                  name: segment.name,
+                  valueText: isFound
+                    ? value
+                    : value === ""
+                      ? "empty — set a value in the Params tab"
+                      : "not defined — add it in the Params tab",
+                  valueIsMissing: !isFound,
+                  content: segment.content,
+                  startIndex: segment.startIndex,
+                  onMouseDown: handleTokenMouseDown,
+                  onDoubleClick: handleTokenDoubleClick,
+                });
               })}
             </div>
           </div>
@@ -569,7 +638,7 @@ export function TemplateHighlightInput({
               : undefined
           }
           className={cn(
-            hasTemplates
+            hasTokens
               ? "relative z-10 bg-transparent text-transparent caret-foreground selection:bg-primary/20 selection:text-transparent"
               : "",
           )}
@@ -596,7 +665,7 @@ export function TemplateHighlightInput({
         className="w-72 max-w-[min(20rem,calc(100vw-1rem))] p-1"
       >
         <div className="px-2 pb-1.5 pt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-          Environment variables
+          {suggestionHeader}
         </div>
         <div
           ref={listRef}
@@ -605,8 +674,12 @@ export function TemplateHighlightInput({
         >
           {suggestions.map((name, index) => {
             const selected = index === autocomplete.selectedIndex;
-            const palette = TEMPLATE_COLORS[getColorIndex(name)];
-            const preview = templateValues[name];
+            const palette =
+              suggestionPalette ?? TEMPLATE_COLORS[getColorIndex(name)];
+            const preview =
+              autocomplete.kind === "pathParam"
+                ? pathParamValues?.[name]
+                : templateValues[name];
             return (
               <button
                 key={name}
@@ -669,6 +742,90 @@ export function TemplateHighlightInput({
   );
 }
 
+type RenderTokenArgs = {
+  key: string;
+  palette: Palette;
+  label: string;
+  name: string;
+  valueText: string;
+  valueIsMissing: boolean;
+  content: string;
+  startIndex: number;
+  onMouseDown: (
+    event: ReactMouseEvent<HTMLSpanElement>,
+    startIndex: number,
+    length: number,
+  ) => void;
+  onDoubleClick: (
+    event: ReactMouseEvent<HTMLSpanElement>,
+    startIndex: number,
+    length: number,
+  ) => void;
+};
+
+function renderTokenWithCard({
+  key,
+  palette,
+  label,
+  name,
+  valueText,
+  valueIsMissing,
+  content,
+  startIndex,
+  onMouseDown,
+  onDoubleClick,
+}: RenderTokenArgs) {
+  const tokenNode = (
+    <span
+      className={cn(
+        "pointer-events-auto cursor-text whitespace-pre rounded-sm align-baseline",
+        "transition-colors",
+        palette.text,
+        palette.bg,
+      )}
+      onMouseDown={(event) => onMouseDown(event, startIndex, content.length)}
+      onDoubleClick={(event) =>
+        onDoubleClick(event, startIndex, content.length)
+      }
+    >
+      {content}
+    </span>
+  );
+
+  return (
+    <HoverCard key={key} openDelay={120} closeDelay={80}>
+      <HoverCardTrigger asChild>{tokenNode}</HoverCardTrigger>
+
+      <HoverCardContent
+        align="start"
+        sideOffset={8}
+        className={cn(
+          "min-w-[220px] w-auto rounded-md border bg-popover p-2 shadow-lg",
+          palette.cardAccent,
+        )}
+      >
+        <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <span className={cn("h-2 w-2 rounded-full", palette.cardDot)} />
+          <code className="font-mono text-foreground">{name}</code>
+        </div>
+        <div
+          className={cn(
+            "mt-1 break-all text-[11px] font-mono",
+            valueIsMissing
+              ? "text-red-500 dark:text-red-300"
+              : "text-muted-foreground",
+          )}
+        >
+          {valueText}
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
 type Segment =
   | {
       type: "text";
@@ -681,50 +838,147 @@ type Segment =
       name: string;
       startIndex: number;
       colorIndex: number;
+    }
+  | {
+      type: "pathParam";
+      content: string;
+      name: string;
+      startIndex: number;
     };
 
-function splitTemplateSegments(value: string): Segment[] {
+function splitSegments(value: string, pathParamsEnabled: boolean): Segment[] {
   if (!value) {
     return [];
   }
 
-  const segments: Segment[] = [];
-  let lastIndex = 0;
-  const regex = new RegExp(TEMPLATE_REGEX);
-  let match = regex.exec(value);
+  type Match = {
+    kind: "template" | "pathParam";
+    start: number;
+    end: number;
+    name: string;
+  };
 
-  while (match) {
-    if (match.index > lastIndex) {
-      segments.push({
-        type: "text",
-        content: value.slice(lastIndex, match.index),
-        startIndex: lastIndex,
-      });
-    }
+  const matches: Match[] = [];
 
-    const variableName = String(match[1] ?? "").trim();
-    const matchEnd = match.index + match[0].length;
-    segments.push({
-      type: "template",
-      content: match[0],
-      name: variableName,
-      startIndex: match.index,
-      colorIndex: getColorIndex(variableName),
+  const templateRegex = new RegExp(TEMPLATE_REGEX);
+  let templateMatch = templateRegex.exec(value);
+  while (templateMatch) {
+    matches.push({
+      kind: "template",
+      start: templateMatch.index,
+      end: templateMatch.index + templateMatch[0].length,
+      name: String(templateMatch[1] ?? "").trim(),
     });
-
-    lastIndex = matchEnd;
-    match = regex.exec(value);
+    templateMatch = templateRegex.exec(value);
   }
 
-  if (lastIndex < value.length) {
+  if (pathParamsEnabled) {
+    // Lookbehind: only treat `:name` as a path param when it follows a
+    // path separator. This excludes URL components like `:8080` (port)
+    // and the colon in `https://`. Falls back to a manual scan because
+    // the regex compile cost should be paid once.
+    const pathRegex = /(?<=^|\/):([A-Za-z_][A-Za-z0-9_]*)/g;
+    let pathMatch = pathRegex.exec(value);
+    while (pathMatch) {
+      matches.push({
+        kind: "pathParam",
+        start: pathMatch.index,
+        end: pathMatch.index + pathMatch[0].length,
+        name: pathMatch[1],
+      });
+      pathMatch = pathRegex.exec(value);
+    }
+  }
+
+  matches.sort((a, b) => a.start - b.start);
+
+  const segments: Segment[] = [];
+  let cursor = 0;
+  for (const match of matches) {
+    if (match.start < cursor) {
+      // Two recognisers collided on overlapping spans (shouldn't happen
+      // in practice — `{{` and `:` are disjoint triggers — but guard
+      // anyway so a malformed input never throws).
+      continue;
+    }
+    if (match.start > cursor) {
+      segments.push({
+        type: "text",
+        content: value.slice(cursor, match.start),
+        startIndex: cursor,
+      });
+    }
+    if (match.kind === "template") {
+      segments.push({
+        type: "template",
+        content: value.slice(match.start, match.end),
+        name: match.name,
+        startIndex: match.start,
+        colorIndex: getColorIndex(match.name),
+      });
+    } else {
+      segments.push({
+        type: "pathParam",
+        content: value.slice(match.start, match.end),
+        name: match.name,
+        startIndex: match.start,
+      });
+    }
+    cursor = match.end;
+  }
+
+  if (cursor < value.length) {
     segments.push({
       type: "text",
-      content: value.slice(lastIndex),
-      startIndex: lastIndex,
+      content: value.slice(cursor),
+      startIndex: cursor,
     });
   }
 
   return segments;
+}
+
+type DetectedTrigger = {
+  kind: AutocompleteKind;
+  tokenStart: number;
+  query: string;
+};
+
+function detectTemplateTrigger(before: string): DetectedTrigger | null {
+  const lastOpen = before.lastIndexOf("{{");
+  if (lastOpen === -1) {
+    return null;
+  }
+  const between = before.slice(lastOpen + 2);
+  if (between.includes("}}")) {
+    return null;
+  }
+  const query = between.trim();
+  if (!VARIABLE_NAME_REGEX.test(query)) {
+    return null;
+  }
+  return { kind: "template", tokenStart: lastOpen, query };
+}
+
+function detectPathParamTrigger(before: string): DetectedTrigger | null {
+  let colonIndex = before.lastIndexOf(":");
+  while (colonIndex >= 0) {
+    const isAtStart = colonIndex === 0;
+    const precededBySlash = !isAtStart && before[colonIndex - 1] === "/";
+    if (isAtStart || precededBySlash) {
+      const between = before.slice(colonIndex + 1);
+      // Only match when the chars after `:` look like a (possibly empty)
+      // identifier — otherwise we'd light up while the user types e.g.
+      // `:foo/bar`, which already closed the previous token.
+      if (PATH_PARAM_NAME_REGEX.test(between)) {
+        return { kind: "pathParam", tokenStart: colonIndex, query: between };
+      }
+      return null;
+    }
+    if (colonIndex === 0) break;
+    colonIndex = before.lastIndexOf(":", colonIndex - 1);
+  }
+  return null;
 }
 
 function getColorIndex(variableName: string): number {
@@ -737,11 +991,8 @@ function getColorIndex(variableName: string): number {
   return Math.abs(hash) % TEMPLATE_COLORS.length;
 }
 
-function hasTemplateValue(
-  variableName: string,
-  templateValues: Record<string, string>,
-): boolean {
-  return Object.prototype.hasOwnProperty.call(templateValues, variableName);
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
 }
 
 let measurementCanvas: HTMLCanvasElement | null = null;

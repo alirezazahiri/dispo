@@ -1,3 +1,4 @@
+import { Info, Plus, Trash2 } from "lucide-react";
 import type { RequestTab } from "../../types";
 import {
   Tabs,
@@ -9,16 +10,23 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Button,
+  Checkbox,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "@/components";
 import {
   KeyValueRowsEditor,
-  MonacoBaseEditor,
   TemplateHighlightInput,
 } from "@/components/shared";
 import { useActiveEnvironment, useWorkspaceUpdateTab } from "../../stores";
 import type { KeyValuePair, RequestAuthType } from "../../types";
 import { ScriptsTab } from "./scripts-tab";
 import { RequestBodyEditor } from "./request-body-editor";
+import { extractPathParamNames } from "../request-toolbar/utils";
 
 type Props = {
   tab: RequestTab;
@@ -103,6 +111,50 @@ export function RequestEditor({ tab }: Props) {
       isDirty: true,
     });
   };
+
+  const handleAddPathParam = () => {
+    updateTab(tab.id, {
+      pathParams: [
+        ...(tab.pathParams ?? []),
+        {
+          id: crypto.randomUUID(),
+          key: "",
+          value: "",
+          enabled: true,
+        },
+      ],
+      isDirty: true,
+    });
+  };
+
+  const handleUpdatePathParam = (
+    rowId: string,
+    data: Partial<KeyValuePair>,
+  ) => {
+    updateTab(tab.id, {
+      pathParams: updateKeyValueRows(tab.pathParams ?? [], rowId, data),
+      isDirty: true,
+    });
+  };
+
+  const handleRemovePathParam = (rowId: string) => {
+    updateTab(tab.id, {
+      pathParams: (tab.pathParams ?? []).filter((row) => row.id !== rowId),
+      isDirty: true,
+    });
+  };
+
+  const pathParamRows = tab.pathParams ?? [];
+
+  // Names currently referenced as `:name` placeholders in the URL. Used
+  // to distinguish "active" rows (referenced from the URL) from "orphan"
+  // rows (defined but no longer referenced) so the user has a hint about
+  // which rows actually affect the next request.
+  const urlPathParamNames = new Set(extractPathParamNames(tab.url));
+  const orphanCount = pathParamRows.filter((row) => {
+    const key = row.key.trim();
+    return key !== "" && !urlPathParamNames.has(key);
+  }).length;
 
   const handleAuthTypeChange = (type: RequestAuthType) => {
     updateTab(tab.id, {
@@ -249,16 +301,27 @@ export function RequestEditor({ tab }: Props) {
         <TabsContent
           value="params"
           className="
-            mt-0 min-h-0 flex-1
+            mt-0 min-h-0 flex-1 overflow-auto
           "
         >
-          <KeyValueRowsEditor
-            title="Query Params"
-            rows={tab.queryParams}
-            onAddRow={handleAddParam}
-            onUpdateRow={handleUpdateParam}
-            onRemoveRow={handleRemoveParam}
-          />
+          <div className="flex flex-col">
+            <PathParamsSection
+              rows={pathParamRows}
+              urlNames={urlPathParamNames}
+              orphanCount={orphanCount}
+              onAddRow={handleAddPathParam}
+              onUpdateRow={handleUpdatePathParam}
+              onRemoveRow={handleRemovePathParam}
+            />
+
+            <KeyValueRowsEditor
+              title="Query Params"
+              rows={tab.queryParams}
+              onAddRow={handleAddParam}
+              onUpdateRow={handleUpdateParam}
+              onRemoveRow={handleRemoveParam}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent
@@ -325,4 +388,142 @@ function buildTemplateValues(variables: KeyValuePair[]) {
     }
     return acc;
   }, {});
+}
+
+type PathParamsSectionProps = {
+  rows: KeyValuePair[];
+  urlNames: Set<string>;
+  orphanCount: number;
+  onAddRow: () => void;
+  onUpdateRow: (rowId: string, data: Partial<KeyValuePair>) => void;
+  onRemoveRow: (rowId: string) => void;
+};
+
+function PathParamsSection({
+  rows,
+  urlNames,
+  orphanCount,
+  onAddRow,
+  onUpdateRow,
+  onRemoveRow,
+}: PathParamsSectionProps) {
+  return (
+    <div className="border-b border-border">
+      <div className="border-b border-border px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="text-sm text-muted-foreground">Path Params</div>
+
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="About path params"
+                  className="
+                    inline-flex h-5 w-5 items-center justify-center
+                    rounded text-muted-foreground/70
+                    hover:bg-accent/60 hover:text-foreground
+                    focus-visible:outline-none focus-visible:ring-2
+                    focus-visible:ring-ring
+                  "
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" className="max-w-xs">
+                <p className="text-xs leading-relaxed">
+                  Type <code className="font-mono">:name</code> in the URL to
+                  auto-add a row, or define rows here first and reference them
+                  by name.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {orphanCount > 0 ? (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400 truncate">
+              {orphanCount} row{orphanCount === 1 ? "" : "s"} not referenced
+              from the URL
+            </span>
+          ) : null}
+        </div>
+        <Button
+          onClick={onAddRow}
+          variant="outline"
+          size="sm"
+          className="gap-2 shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          Add Row
+        </Button>
+      </div>
+
+      <div className="p-4">
+        <div className="min-w-[640px] space-y-2">
+          <div className="grid grid-cols-[80px_1fr_1fr_48px] gap-2 text-xs text-muted-foreground px-2">
+            <div>Enabled</div>
+            <div>Key</div>
+            <div>Value</div>
+            <div />
+          </div>
+
+          {rows.map((row) => {
+            return (
+              <div
+                key={row.id}
+                className="grid grid-cols-[80px_1fr_1fr_48px] gap-2 items-center"
+              >
+                <div className="flex items-center pl-1">
+                  <Checkbox
+                    checked={row.enabled}
+                    onCheckedChange={(checked) =>
+                      onUpdateRow(row.id, { enabled: checked })
+                    }
+                    aria-label="Toggle path param row"
+                  />
+                </div>
+
+                <Input
+                  value={row.key}
+                  onChange={(event) =>
+                    onUpdateRow(row.id, { key: event.target.value })
+                  }
+                  placeholder="Key"
+                />
+
+                <Input
+                  value={row.value}
+                  onChange={(event) =>
+                    onUpdateRow(row.id, { value: event.target.value })
+                  }
+                  placeholder={
+                    row.key
+                      ? `:${row.key} param value...`
+                      : "Path param value..."
+                  }
+                />
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveRow(row.id)}
+                  className="text-muted-foreground"
+                  aria-label="Remove path param row"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            );
+          })}
+
+          {rows.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-6 text-center">
+              No path params yet. Add one here, or type{" "}
+              <code className="font-mono">:name</code> in the URL.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }

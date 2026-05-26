@@ -124,6 +124,15 @@ func (r *Repository) initSchema() error {
 			enabled INTEGER NOT NULL,
 			FOREIGN KEY(saved_request_id) REFERENCES saved_requests(id) ON DELETE CASCADE
 		)`,
+		`CREATE TABLE IF NOT EXISTS saved_request_path_params (
+			id TEXT PRIMARY KEY,
+			saved_request_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			key_name TEXT NOT NULL,
+			value TEXT NOT NULL,
+			enabled INTEGER NOT NULL,
+			FOREIGN KEY(saved_request_id) REFERENCES saved_requests(id) ON DELETE CASCADE
+		)`,
 	}
 
 	for _, statement := range statements {
@@ -408,6 +417,9 @@ func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequ
 	if _, err = tx.Exec(`DELETE FROM saved_request_query_params WHERE saved_request_id = ?`, payload.ID); err != nil {
 		return api.SavedRequestPayload{}, fmt.Errorf("clear saved request query params: %w", err)
 	}
+	if _, err = tx.Exec(`DELETE FROM saved_request_path_params WHERE saved_request_id = ?`, payload.ID); err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("clear saved request path params: %w", err)
+	}
 
 	for index, header := range payload.Headers {
 		headerID := header.ID
@@ -432,6 +444,19 @@ func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequ
 			paramID, payload.ID, index, param.Key, param.Value, boolToInt(param.Enabled),
 		); err != nil {
 			return api.SavedRequestPayload{}, fmt.Errorf("insert saved request param: %w", err)
+		}
+	}
+
+	for index, param := range payload.PathParams {
+		paramID := param.ID
+		if paramID == "" {
+			paramID = newID()
+		}
+		if _, err = tx.Exec(
+			`INSERT INTO saved_request_path_params (id, saved_request_id, position, key_name, value, enabled) VALUES (?, ?, ?, ?, ?, ?)`,
+			paramID, payload.ID, index, param.Key, param.Value, boolToInt(param.Enabled),
+		); err != nil {
+			return api.SavedRequestPayload{}, fmt.Errorf("insert saved request path param: %w", err)
 		}
 	}
 
@@ -537,8 +562,13 @@ func (r *Repository) loadSavedRequestByID(id string) (api.SavedRequestPayload, e
 	if err != nil {
 		return api.SavedRequestPayload{}, err
 	}
+	pathParams, err := r.loadRequestRows("saved_request_path_params", request.ID)
+	if err != nil {
+		return api.SavedRequestPayload{}, err
+	}
 	request.Headers = headers
 	request.QueryParams = params
+	request.PathParams = pathParams
 
 	return request, nil
 }
@@ -607,8 +637,13 @@ func (r *Repository) loadSavedRequests(collectionID string) ([]api.SavedRequestP
 		if err != nil {
 			return nil, err
 		}
+		pathParams, err := r.loadRequestRows("saved_request_path_params", request.ID)
+		if err != nil {
+			return nil, err
+		}
 		request.Headers = headers
 		request.QueryParams = params
+		request.PathParams = pathParams
 		requests = append(requests, request)
 	}
 	return requests, rows.Err()

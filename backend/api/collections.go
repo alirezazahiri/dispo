@@ -39,6 +39,7 @@ type SavedRequestPayload struct {
 	PostResponseScript string                 `json:"postResponseScript"`
 	Headers            []KeyValuePayload      `json:"headers"`
 	QueryParams        []KeyValuePayload      `json:"queryParams"`
+	PathParams         []KeyValuePayload      `json:"pathParams"`
 	Auth               RequestAuthPayload     `json:"auth"`
 	SortOrder          int                    `json:"sortOrder"`
 	CreatedAt          int64                  `json:"createdAt"`

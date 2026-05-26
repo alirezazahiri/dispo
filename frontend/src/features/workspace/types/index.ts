@@ -194,6 +194,19 @@ export type RequestTab = {
 
   queryParams: KeyValuePair[];
 
+  /**
+   * Path parameters extracted from `:name` placeholders in the request URL
+   * (REST-style, e.g. `/users/:userId/posts/:postId`).
+   *
+   * Rows are auto-created when the user types a new `:name` segment in the
+   * URL and preserved across edits so values survive when the user briefly
+   * deletes a token. A row whose `key` is no longer referenced from the URL
+   * is "orphaned" and silently ignored at send time, but remains visible in
+   * the editor so the user can re-introduce the token without losing the
+   * value they had typed.
+   */
+  pathParams: KeyValuePair[];
+
   auth: RequestAuth;
 
   response?: ResponseData;

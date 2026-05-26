@@ -150,6 +150,7 @@ function sanitizeState(
       fileBody: tab.fileBody ?? template.fileBody,
       graphqlQuery: tab.graphqlQuery ?? template.graphqlQuery,
       graphqlVariables: tab.graphqlVariables ?? template.graphqlVariables,
+      pathParams: tab.pathParams ?? template.pathParams,
     };
   });
 
@@ -472,6 +473,7 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
       tab.postResponseScript = savedRequest.postResponseScript;
       tab.headers = savedRequest.headers;
       tab.queryParams = savedRequest.queryParams;
+      tab.pathParams = savedRequest.pathParams ?? [];
       tab.auth = savedRequest.auth;
       tab.isDirty = false;
 
@@ -540,6 +542,7 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         postResponseScript: tab.postResponseScript,
         headers: tab.headers,
         queryParams: tab.queryParams,
+        pathParams: tab.pathParams,
         auth: tab.auth,
         sortOrder: existingRequest?.sortOrder ?? 0,
         createdAt: Date.now(),
