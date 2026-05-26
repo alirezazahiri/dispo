@@ -32,7 +32,12 @@ func NewRepository() (*Repository, error) {
 	}
 
 	dbPath := filepath.Join(dbDir, "workspace.db")
-	db, err := sql.Open("sqlite", dbPath)
+	// busy_timeout makes SQLite wait briefly for the write lock instead of
+	// returning SQLITE_BUSY immediately. Important because the workspace and
+	// collections services share the same file with independent connection
+	// pools.
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)", dbPath)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}

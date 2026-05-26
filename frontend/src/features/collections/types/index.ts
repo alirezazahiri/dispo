@@ -1,4 +1,8 @@
-import type { KeyValuePair, RequestAuth, HttpMethod } from "@/features/workspace/types";
+import type {
+  KeyValuePair,
+  RequestAuth,
+  HttpMethod,
+} from "@/features/workspace/types";
 
 export type Collection = {
   id: string;
@@ -41,4 +45,25 @@ export type CollectionTree = {
   collection: Collection;
   folders: Folder[];
   savedRequests: SavedRequest[];
+};
+
+export type CollectionRootDropData = {
+  type: "collection-root";
+  collectionId: string;
+  folderId: null;
+};
+
+export type FolderDropData = {
+  type: "folder";
+  collectionId: string;
+  folderId: string;
+};
+
+export type RequestDragData = {
+  type: "request";
+  requestId: string;
+  collectionId: string;
+  folderId: string | null;
+  name: string;
+  method: HttpMethod;
 };

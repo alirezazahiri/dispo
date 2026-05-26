@@ -84,3 +84,13 @@ type MoveSavedRequestInput struct {
 	NewFolderID  *string `json:"newFolderId,omitempty"`
 	NewSortOrder int     `json:"newSortOrder"`
 }
+
+type ReorderSavedRequestItem struct {
+	ID           string  `json:"id"`
+	NewFolderID  *string `json:"newFolderId,omitempty"`
+	NewSortOrder int     `json:"newSortOrder"`
+}
+
+type ReorderSavedRequestsInput struct {
+	Items []ReorderSavedRequestItem `json:"items"`
+}

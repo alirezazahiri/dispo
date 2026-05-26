@@ -1,16 +1,7 @@
-import { useState } from "react";
-import {
-  ArrowDownToLine,
-  ArrowUpToLine,
-  Copy,
-  Eraser,
-  Minus,
-  MoreHorizontal,
-  Pencil,
-  PencilLine,
-  Trash2,
-  Wrench,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Copy, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
   Button,
   DropdownMenu,
@@ -21,6 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { SavedRequest } from "@/features";
 import { HttpMethod } from "@/features/workspace/types";
+import { RequestMethodIcon } from "./request-method-icon";
+import type { RequestDragData } from "../types";
 
 type RequestNodeProps = {
   request: SavedRequest;
@@ -40,15 +33,68 @@ export function RequestNode({
   isActive,
 }: RequestNodeProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
+
+  const dragData = useMemo<RequestDragData>(
+    () => ({
+      type: "request",
+      requestId: request.id,
+      collectionId: request.collectionId,
+      folderId: request.folderId,
+      name: request.name,
+      method: request.method as HttpMethod,
+    }),
+    [
+      request.id,
+      request.collectionId,
+      request.folderId,
+      request.name,
+      request.method,
+    ],
+  );
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+    active,
+  } = useSortable({
+    id: request.id,
+    data: dragData,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const activeData = active?.data.current as RequestDragData | undefined;
+  const isValidDropTarget =
+    isOver &&
+    activeData?.type === "request" &&
+    activeData.requestId !== request.id &&
+    activeData.collectionId === request.collectionId;
+
+  console.log("isValidDropTarget", isValidDropTarget);
+  console.log("activeData", activeData);
+
   return (
     <div
+      ref={setSortableRef}
+      style={style}
+      {...attributes}
+      {...listeners}
       onContextMenu={(event) => {
         event.preventDefault();
         setActionsOpen(true);
       }}
       className={cn(
-        "group flex w-full items-center gap-1 rounded-md px-1 py-1 text-muted-foreground hover:bg-accent hover:text-foreground",
+        "group flex w-full cursor-grab touch-none items-center gap-1 rounded-md px-1 py-1 text-muted-foreground hover:bg-accent hover:text-foreground active:cursor-grabbing",
         isActive && "bg-accent text-foreground",
+        isDragging && "opacity-40",
+        isValidDropTarget && "ring-1 ring-primary/60",
       )}
     >
       <button
@@ -89,23 +135,4 @@ export function RequestNode({
       </DropdownMenu>
     </div>
   );
-}
-
-function RequestMethodIcon({ method }: { method: HttpMethod }) {
-  switch (method) {
-    case "GET":
-      return <ArrowDownToLine className="h-4 w-4 shrink-0 text-blue-500" />;
-    case "POST":
-      return <ArrowUpToLine className="h-4 w-4 shrink-0 text-green-500" />;
-    case "PUT":
-      return <PencilLine className="h-4 w-4 shrink-0 text-amber-500" />;
-    case "PATCH":
-      return <Wrench className="h-4 w-4 shrink-0 text-purple-500" />;
-    case "DELETE":
-      return <Eraser className="h-4 w-4 shrink-0 text-red-500" />;
-    case "HEAD":
-    case "OPTIONS":
-    default:
-      return <Minus className="h-4 w-4 shrink-0 text-muted-foreground" />;
-  }
 }

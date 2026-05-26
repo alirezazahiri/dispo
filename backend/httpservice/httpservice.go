@@ -54,7 +54,7 @@ func (a *HTTPService) SendHttpRequest(
 		}, nil
 	}
 
-	request.Header.Set("User-Agent", "dispo/1.0")
+	request.Header.Set("User-Agent", "Dispo/1.0")
 
 	for key, value := range req.Headers {
 		request.Header.Set(key, value)

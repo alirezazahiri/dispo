@@ -98,7 +98,7 @@ function buildRequestDetails(
       ? `Bearer ${tab.auth.bearerToken}`
       : headersMap.authorization || "Not set";
 
-  const userAgent = headersMap["user-agent"] || "dispo/1.0";
+  const userAgent = headersMap["user-agent"] || "Dispo/1.0";
   const contentType = headersMap["content-type"] || "Not set";
   const host = extractHost(tab.url || "");
   const contentLength = String(new TextEncoder().encode(body).length);

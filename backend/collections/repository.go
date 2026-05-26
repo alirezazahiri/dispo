@@ -36,7 +36,12 @@ func NewRepository() (*Repository, error) {
 	}
 
 	dbPath := filepath.Join(dbDir, "workspace.db")
-	db, err := sql.Open("sqlite", dbPath)
+	// busy_timeout makes SQLite wait briefly for the write lock instead of
+	// returning SQLITE_BUSY immediately. Important because the workspace and
+	// collections services share the same file with independent connection
+	// pools.
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)", dbPath)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
 	}
@@ -430,6 +435,47 @@ func (r *Repository) MoveRequest(input api.MoveSavedRequestInput) error {
 	)
 	if err != nil {
 		return fmt.Errorf("move saved request: %w", err)
+	}
+	return nil
+}
+
+// ReorderRequests applies an ordered batch of folder/sortOrder updates inside
+// a single SQL transaction. This avoids the SQLITE_BUSY contention that would
+// otherwise happen if the frontend issued many parallel MoveRequest calls.
+func (r *Repository) ReorderRequests(input api.ReorderSavedRequestsInput) error {
+	if len(input.Items) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin reorder transaction: %w", err)
+	}
+
+	stmt, err := tx.Prepare(
+		`UPDATE saved_requests SET folder_id = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("prepare reorder statement: %w", err)
+	}
+
+	now := time.Now().UnixMilli()
+	for _, item := range input.Items {
+		if _, err := stmt.Exec(item.NewFolderID, item.NewSortOrder, now, item.ID); err != nil {
+			_ = stmt.Close()
+			_ = tx.Rollback()
+			return fmt.Errorf("reorder saved request %s: %w", item.ID, err)
+		}
+	}
+
+	if err := stmt.Close(); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("close reorder statement: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit reorder transaction: %w", err)
 	}
 	return nil
 }

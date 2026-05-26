@@ -3,7 +3,13 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { backendClient } from "@/lib/backend/client";
-import type { Collection, CollectionTree, Folder, SavedRequest } from "../types";
+import type {
+  Collection,
+  CollectionTree,
+  Folder,
+  SavedRequest,
+} from "../types";
+import { isPresentAndNotEmpty } from "@/lib/utils";
 
 type CollectionsStore = {
   collectionsById: Record<string, Collection>;
@@ -25,7 +31,11 @@ type CollectionsStore = {
     name: string,
     parentFolderId?: string | null,
   ) => Promise<Folder>;
-  renameFolder: (id: string, collectionId: string, name: string) => Promise<void>;
+  renameFolder: (
+    id: string,
+    collectionId: string,
+    name: string,
+  ) => Promise<void>;
   deleteFolder: (id: string, collectionId: string) => Promise<void>;
 
   createRequest: (
@@ -33,9 +43,24 @@ type CollectionsStore = {
     folderId?: string | null,
     name?: string,
   ) => Promise<SavedRequest>;
-  renameRequest: (id: string, collectionId: string, name: string) => Promise<void>;
+  renameRequest: (
+    id: string,
+    collectionId: string,
+    name: string,
+  ) => Promise<void>;
   duplicateRequest: (id: string, collectionId: string) => Promise<SavedRequest>;
   upsertRequest: (savedRequest: SavedRequest) => void;
+  moveRequest: (
+    id: string,
+    collectionId: string,
+    newFolderId: string | null,
+    /**
+     * The ids of every request that should live in `newFolderId` AFTER the
+     * move, in the desired display order (including `id` itself). The store
+     * renumbers their `sortOrder` values to match this ordering.
+     */
+    targetOrder: string[],
+  ) => Promise<void>;
   deleteRequest: (id: string, collectionId: string) => Promise<void>;
 
   toggleNodeExpanded: (id: string) => void;
@@ -53,18 +78,19 @@ function normalizeTrees(trees: CollectionTree[]) {
     collectionsById[collection.id] = collection;
     collectionOrder.push(collection.id);
 
-    foldersByCollection[collection.id] = tree.folders.reduce<Record<string, Folder>>((acc, folder) => {
+    foldersByCollection[collection.id] = tree.folders.reduce<
+      Record<string, Folder>
+    >((acc, folder) => {
       acc[folder.id] = folder;
       return acc;
     }, {});
 
-    requestsByCollection[collection.id] = tree.savedRequests.reduce<Record<string, SavedRequest>>(
-      (acc, request) => {
-        acc[request.id] = request;
-        return acc;
-      },
-      {},
-    );
+    requestsByCollection[collection.id] = tree.savedRequests.reduce<
+      Record<string, SavedRequest>
+    >((acc, request) => {
+      acc[request.id] = request;
+      return acc;
+    }, {});
   }
 
   return {
@@ -107,7 +133,10 @@ export const useCollectionsStore = create<CollectionsStore>()(
       },
 
       createCollection: async (name, description = "") => {
-        const collection = await backendClient.collections.createCollection(name, description);
+        const collection = await backendClient.collections.createCollection(
+          name,
+          description,
+        );
         set((state) => ({
           collectionsById: {
             ...state.collectionsById,
@@ -151,10 +180,14 @@ export const useCollectionsStore = create<CollectionsStore>()(
           const nextRequestsByCollection = { ...state.requestsByCollection };
           const nextExpandedNodeIds = { ...state.expandedNodeIds };
           delete nextCollectionsById[id];
-          for (const folderId of Object.keys(nextFoldersByCollection[id] ?? {})) {
+          for (const folderId of Object.keys(
+            nextFoldersByCollection[id] ?? {},
+          )) {
             delete nextExpandedNodeIds[folderId];
           }
-          for (const requestId of Object.keys(nextRequestsByCollection[id] ?? {})) {
+          for (const requestId of Object.keys(
+            nextRequestsByCollection[id] ?? {},
+          )) {
             delete nextExpandedNodeIds[requestId];
           }
           delete nextExpandedNodeIds[id];
@@ -165,13 +198,19 @@ export const useCollectionsStore = create<CollectionsStore>()(
             foldersByCollection: nextFoldersByCollection,
             requestsByCollection: nextRequestsByCollection,
             expandedNodeIds: nextExpandedNodeIds,
-            collectionOrder: state.collectionOrder.filter((collectionId) => collectionId !== id),
+            collectionOrder: state.collectionOrder.filter(
+              (collectionId) => collectionId !== id,
+            ),
           };
         });
       },
 
       createFolder: async (collectionId, name, parentFolderId = null) => {
-        const folder = await backendClient.collections.createFolder(collectionId, name, parentFolderId);
+        const folder = await backendClient.collections.createFolder(
+          collectionId,
+          name,
+          parentFolderId,
+        );
         set((state) => ({
           foldersByCollection: {
             ...state.foldersByCollection,
@@ -208,13 +247,18 @@ export const useCollectionsStore = create<CollectionsStore>()(
       deleteFolder: async (id, collectionId) => {
         await backendClient.collections.deleteFolder(id);
         set((state) => {
-          const nextFolders = { ...(state.foldersByCollection[collectionId] ?? {}) };
+          const nextFolders = {
+            ...(state.foldersByCollection[collectionId] ?? {}),
+          };
           const removedFolderIDs = new Set<string>([id]);
           let changed = true;
           while (changed) {
             changed = false;
             for (const folder of Object.values(nextFolders)) {
-              if (folder.parentFolderId && removedFolderIDs.has(folder.parentFolderId)) {
+              if (
+                folder.parentFolderId &&
+                removedFolderIDs.has(folder.parentFolderId)
+              ) {
                 removedFolderIDs.add(folder.id);
                 changed = true;
               }
@@ -224,7 +268,9 @@ export const useCollectionsStore = create<CollectionsStore>()(
             delete nextFolders[folderId];
           }
 
-          const nextRequests = { ...(state.requestsByCollection[collectionId] ?? {}) };
+          const nextRequests = {
+            ...(state.requestsByCollection[collectionId] ?? {}),
+          };
           for (const request of Object.values(nextRequests)) {
             if (request.folderId && removedFolderIDs.has(request.folderId)) {
               nextRequests[request.id] = {
@@ -253,7 +299,11 @@ export const useCollectionsStore = create<CollectionsStore>()(
         });
       },
 
-      createRequest: async (collectionId, folderId = null, name = "New Request") => {
+      createRequest: async (
+        collectionId,
+        folderId = null,
+        name = "New Request",
+      ) => {
         const created = await backendClient.collections.saveRequest({
           id: "",
           collectionId,
@@ -296,8 +346,9 @@ export const useCollectionsStore = create<CollectionsStore>()(
             return collectionId;
           }
           return (
-            Object.entries(get().requestsByCollection).find(([, requests]) => Boolean(requests[id]))?.[0] ??
-            collectionId
+            Object.entries(get().requestsByCollection).find(([, requests]) =>
+              Boolean(requests[id]),
+            )?.[0] ?? collectionId
           );
         })();
         set((state) => ({
@@ -344,10 +395,116 @@ export const useCollectionsStore = create<CollectionsStore>()(
         }));
       },
 
+      moveRequest: async (id, collectionId, newFolderId, targetOrder) => {
+        const requestsInCollection =
+          get().requestsByCollection[collectionId] ?? {};
+        const moving = requestsInCollection[id];
+        if (!moving) {
+          return;
+        }
+
+        // Compute the minimum set of (folderId, sortOrder) updates needed.
+        // Only the moved request changes folder; siblings just get renumbered.
+        const updates: Array<{
+          id: string;
+          folderId: string | null;
+          sortOrder: number;
+        }> = [];
+        targetOrder.forEach((requestId, index) => {
+          const current = requestsInCollection[requestId];
+          if (!current) {
+            return;
+          }
+          const nextFolderId =
+            requestId === id ? newFolderId : (current.folderId ?? null);
+          const nextSortOrder = index;
+          if (
+            isPresentAndNotEmpty(current.folderId)
+              ? current.folderId !== nextFolderId
+              : isPresentAndNotEmpty(newFolderId) ||
+                current.sortOrder !== nextSortOrder
+          ) {
+            updates.push({
+              id: requestId,
+              folderId: nextFolderId,
+              sortOrder: nextSortOrder,
+            });
+          }
+        });
+
+        if (updates.length === 0) {
+          return;
+        }
+
+        // Snapshot for rollback.
+        const previousById: Record<string, SavedRequest> = {};
+        for (const update of updates) {
+          const prev = requestsInCollection[update.id];
+          if (prev) {
+            previousById[update.id] = prev;
+          }
+        }
+
+        set((state) => {
+          const next = { ...(state.requestsByCollection[collectionId] ?? {}) };
+          for (const update of updates) {
+            const current = next[update.id];
+            if (current) {
+              next[update.id] = {
+                ...current,
+                folderId: update.folderId,
+                sortOrder: update.sortOrder,
+              };
+            }
+          }
+          return {
+            requestsByCollection: {
+              ...state.requestsByCollection,
+              [collectionId]: next,
+            },
+            expandedNodeIds: newFolderId
+              ? { ...state.expandedNodeIds, [newFolderId]: true }
+              : state.expandedNodeIds,
+          };
+        });
+
+        try {
+          // Single transactional call on the backend — avoids SQLITE_BUSY
+          // that would otherwise come from N parallel UPDATE statements.
+          await backendClient.collections.reorderRequests(
+            updates.map((update) => ({
+              id: update.id,
+              newFolderId: update.folderId,
+              newSortOrder: update.sortOrder,
+            })),
+          );
+        } catch (error) {
+          set((state) => {
+            const restored = {
+              ...(state.requestsByCollection[collectionId] ?? {}),
+            };
+            for (const previous of Object.values(previousById)) {
+              restored[previous.id] = previous;
+            }
+            return {
+              requestsByCollection: {
+                ...state.requestsByCollection,
+                [collectionId]: restored,
+              },
+            };
+          });
+          console.error("Failed to move request", error);
+          toast.error("Failed to move request");
+          throw error;
+        }
+      },
+
       deleteRequest: async (id, collectionId) => {
         await backendClient.collections.deleteRequest(id);
         set((state) => {
-          const nextRequests = { ...(state.requestsByCollection[collectionId] ?? {}) };
+          const nextRequests = {
+            ...(state.requestsByCollection[collectionId] ?? {}),
+          };
           delete nextRequests[id];
           const nextExpandedNodeIds = { ...state.expandedNodeIds };
           delete nextExpandedNodeIds[id];

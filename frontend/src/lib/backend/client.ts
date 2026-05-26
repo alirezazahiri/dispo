@@ -57,6 +57,23 @@ export const backendClient = {
         newFolderId: newFolderId ?? undefined,
         newSortOrder,
       }) as Promise<void>,
+    reorderRequests: (
+      items: Array<{
+        id: string;
+        newFolderId: string | null;
+        newSortOrder: number;
+      }>,
+    ) =>
+      // Cast through any: the Wails-generated type is a class with a
+      // `convertValues` method that we don't need at the call site — the
+      // runtime bridge accepts the plain JSON shape.
+      CollectionsService.ReorderRequests({
+        items: items.map((item) => ({
+          id: item.id,
+          newFolderId: item.newFolderId ?? undefined,
+          newSortOrder: item.newSortOrder,
+        })),
+      } as any) as Promise<void>,
     deleteRequest: (id: string) =>
       CollectionsService.DeleteRequest({ id }) as Promise<void>,
     renameRequest: (id: string, name: string) =>

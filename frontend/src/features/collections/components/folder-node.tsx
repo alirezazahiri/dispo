@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useDndMonitor, useDroppable } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import {
   ChevronRight,
   FilePlus,
@@ -21,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Folder as FolderType, SavedRequest } from "@/features";
 import { RequestNode } from "./request-node";
+import type { FolderDropData, RequestDragData } from "../types";
 
 type FolderNodeProps = {
   folder: FolderType;
@@ -53,9 +59,73 @@ export function FolderNode({
 }: FolderNodeProps) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const expanded = Boolean(expandedNodeIds[folder.id]);
-  const childrenRequests = requests
-    .filter((request) => request.folderId === folder.id)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const childrenRequests = useMemo(
+    () =>
+      requests
+        .filter((request) => request.folderId === folder.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [requests, folder.id],
+  );
+  const childrenRequestIds = useMemo(
+    () => childrenRequests.map((request) => request.id),
+    [childrenRequests],
+  );
+
+  const dropData: FolderDropData = {
+    type: "folder",
+    collectionId: folder.collectionId,
+    folderId: folder.id,
+  };
+  const {
+    isOver,
+    active,
+    setNodeRef: setDroppableRef,
+  } = useDroppable({
+    id: `folder:${folder.id}`,
+    data: dropData,
+  });
+
+  const activeData = active?.data.current as RequestDragData | undefined;
+  console.log("activeData", activeData);
+  const isValidDropTarget =
+    activeData?.type === "request" &&
+    activeData.collectionId === folder.collectionId &&
+    activeData.folderId !== folder.id;
+  const isInvalidDropTarget =
+    activeData?.type === "request" &&
+    activeData.collectionId !== folder.collectionId;
+  const isHighlighted = isOver && isValidDropTarget;
+  const isRejected = isOver && isInvalidDropTarget;
+
+  const expandTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isHighlighted && !expanded) {
+      expandTimerRef.current = window.setTimeout(() => {
+        toggleNodeExpanded(folder.id);
+      }, 600);
+    }
+    return () => {
+      if (expandTimerRef.current !== null) {
+        window.clearTimeout(expandTimerRef.current);
+        expandTimerRef.current = null;
+      }
+    };
+  }, [isHighlighted, expanded, folder.id, toggleNodeExpanded]);
+
+  useDndMonitor({
+    onDragEnd: () => {
+      if (expandTimerRef.current !== null) {
+        window.clearTimeout(expandTimerRef.current);
+        expandTimerRef.current = null;
+      }
+    },
+    onDragCancel: () => {
+      if (expandTimerRef.current !== null) {
+        window.clearTimeout(expandTimerRef.current);
+        expandTimerRef.current = null;
+      }
+    },
+  });
 
   return (
     <Collapsible
@@ -63,11 +133,17 @@ export function FolderNode({
       onOpenChange={() => toggleNodeExpanded(folder.id)}
     >
       <div
+        ref={setDroppableRef}
         onContextMenu={(event) => {
           event.preventDefault();
           setActionsOpen(true);
         }}
-        className="group flex w-full items-center gap-1 rounded-md px-1 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+        className={cn(
+          "group flex w-full items-center gap-1 rounded-md px-1 py-1 text-muted-foreground hover:bg-accent hover:text-foreground",
+          isHighlighted &&
+            "bg-primary/15 text-foreground ring-1 ring-primary/60",
+          isRejected && "ring-1 ring-destructive/60",
+        )}
       >
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
@@ -121,17 +197,22 @@ export function FolderNode({
         </DropdownMenu>
       </div>
       <CollapsibleContent className="mt-1 space-y-1 pl-4">
-        {childrenRequests.map((request) => (
-          <RequestNode
-            key={request.id}
-            request={request}
-            onRenameRequest={onRenameRequest}
-            onDuplicateRequest={onDuplicateRequest}
-            onOpenRequest={onOpenRequest}
-            onDeleteRequest={onDeleteRequest}
-            isActive={activeSavedRequestId === request.id}
-          />
-        ))}
+        <SortableContext
+          items={childrenRequestIds}
+          strategy={verticalListSortingStrategy}
+        >
+          {childrenRequests.map((request) => (
+            <RequestNode
+              key={request.id}
+              request={request}
+              onRenameRequest={onRenameRequest}
+              onDuplicateRequest={onDuplicateRequest}
+              onOpenRequest={onOpenRequest}
+              onDeleteRequest={onDeleteRequest}
+              isActive={activeSavedRequestId === request.id}
+            />
+          ))}
+        </SortableContext>
       </CollapsibleContent>
     </Collapsible>
   );
