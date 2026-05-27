@@ -1,27 +1,5 @@
 export namespace api {
 	
-	export class CollectionPayload {
-	    id: string;
-	    name: string;
-	    description: string;
-	    sortOrder: number;
-	    createdAt: number;
-	    updatedAt: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new CollectionPayload(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.description = source["description"];
-	        this.sortOrder = source["sortOrder"];
-	        this.createdAt = source["createdAt"];
-	        this.updatedAt = source["updatedAt"];
-	    }
-	}
 	export class RequestAuthPayload {
 	    type: string;
 	    bearerToken: string;
@@ -35,6 +13,48 @@ export namespace api {
 	        this.type = source["type"];
 	        this.bearerToken = source["bearerToken"];
 	    }
+	}
+	export class CollectionPayload {
+	    id: string;
+	    name: string;
+	    description: string;
+	    sortOrder: number;
+	    auth: RequestAuthPayload;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.sortOrder = source["sortOrder"];
+	        this.auth = this.convertValues(source["auth"], RequestAuthPayload);
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class KeyValuePayload {
 	    id: string;
@@ -459,6 +479,68 @@ export namespace api {
 		    return a;
 		}
 	}
+	export class ImportCollectionInput {
+	    source: string;
+	    filePath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportCollectionInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.filePath = source["filePath"];
+	    }
+	}
+	export class SuggestedVariablePayload {
+	    name: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SuggestedVariablePayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.value = source["value"];
+	    }
+	}
+	export class ImportCollectionResult {
+	    trees: CollectionTreePayload[];
+	    suggestedVariables: SuggestedVariablePayload[];
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportCollectionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.trees = this.convertValues(source["trees"], CollectionTreePayload);
+	        this.suggestedVariables = this.convertValues(source["suggestedVariables"], SuggestedVariablePayload);
+	        this.warnings = source["warnings"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class MoveFolderInput {
 	    id: string;
@@ -719,6 +801,39 @@ export namespace api {
 	}
 	
 	
+	
+	export class UpdateCollectionAuthInput {
+	    id: string;
+	    auth: RequestAuthPayload;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateCollectionAuthInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.auth = this.convertValues(source["auth"], RequestAuthPayload);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class WorkspaceStatePayload {
 	    tabs: RequestTabPayload[];
 	    tabOrderByCollection: Record<string, Array<string>>;

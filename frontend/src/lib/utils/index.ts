@@ -9,3 +9,4 @@ export * from "./bytes";
 export * from "./debounce";
 export * from "./headers";
 export * from "./objects";
+export * from "./template";

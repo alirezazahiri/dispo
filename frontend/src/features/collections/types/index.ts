@@ -17,6 +17,7 @@ export type Collection = {
   name: string;
   description: string;
   sortOrder: number;
+  auth: RequestAuth;
   createdAt: number;
   updatedAt: number;
 };

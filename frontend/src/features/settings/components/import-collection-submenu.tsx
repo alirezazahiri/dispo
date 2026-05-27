@@ -8,12 +8,12 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@/components/ui";
+import { useImportCollection } from "../hooks/use-import-collection";
 
 type ImportSource = {
   id: "postman" | "httpie";
   label: string;
   Icon: typeof FileJson;
-  onSelect: () => void;
 };
 
 const notifyComingSoon = (source: string) => {
@@ -25,13 +25,11 @@ const IMPORT_SOURCES: ImportSource[] = [
     id: "postman",
     label: "From Postman",
     Icon: FileJson,
-    onSelect: () => notifyComingSoon("Postman"),
   },
   {
     id: "httpie",
     label: "From HTTPie",
     Icon: Terminal,
-    onSelect: () => notifyComingSoon("HTTPie"),
   },
 ];
 
@@ -40,6 +38,20 @@ const IMPORT_SOURCES: ImportSource[] = [
  * by appending to {@link IMPORT_SOURCES} once their handlers are wired up.
  */
 export function ImportCollectionSubmenu() {
+  const importCollection = useImportCollection();
+
+  const handleImport = (source: ImportSource["id"]) => {
+    switch (source) {
+      case "httpie":
+        void importCollection("httpie");
+        break;
+      case "postman":
+      default:
+        notifyComingSoon("Postman");
+        break;
+    }
+  };
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger chevronDirection="left">
@@ -49,8 +61,8 @@ export function ImportCollectionSubmenu() {
 
       <DropdownMenuPortal>
         <DropdownMenuSubContent className="w-44">
-          {IMPORT_SOURCES.map(({ id, label, Icon, onSelect }) => (
-            <DropdownMenuItem key={id} onClick={onSelect}>
+          {IMPORT_SOURCES.map(({ id, label, Icon }) => (
+            <DropdownMenuItem key={id} onClick={() => handleImport(id)}>
               <Icon />
               {label}
             </DropdownMenuItem>

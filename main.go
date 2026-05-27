@@ -4,6 +4,7 @@ import (
 	"context"
 	"dispo/backend/collections"
 	"dispo/backend/httpservice"
+	importsvc "dispo/backend/import"
 	"dispo/backend/scripting"
 	"embed"
 	"log"
@@ -18,6 +19,7 @@ var assets embed.FS
 
 func main() {
 	collectionsService := collections.NewService()
+	importService := importsvc.NewService(collectionsService)
 	httpService := httpservice.NewHTTPService()
 	scriptService := scripting.NewService()
 
@@ -53,6 +55,7 @@ func main() {
 			httpService,
 			scriptService,
 			collectionsService,
+			importService,
 		},
 	})
 

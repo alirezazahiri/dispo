@@ -10,6 +10,7 @@ import {
   Folder,
   FolderOpen,
   MoreHorizontal,
+  KeyRound,
   Pencil,
   Trash2,
 } from "lucide-react";
@@ -42,6 +43,7 @@ type CollectionNodeProps = {
   onCreateFolder: () => void;
   onCreateRequest: (folderId: string | null) => void;
   onRenameCollection: () => void;
+  onConfigureAuth: () => void;
   onDeleteCollection: () => void;
   onRenameFolder: (folder: FolderType) => void;
   onRenameRequest: (request: SavedRequest) => void;
@@ -66,6 +68,7 @@ export function CollectionNode({
   onCreateFolder,
   onCreateRequest,
   onRenameCollection,
+  onConfigureAuth,
   onDeleteCollection,
   onRenameFolder,
   onRenameRequest,
@@ -222,6 +225,10 @@ export function CollectionNode({
               <DropdownMenuItem onClick={onRenameCollection}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onConfigureAuth}>
+                <KeyRound className="mr-2 h-4 w-4" />
+                Collection Auth
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"

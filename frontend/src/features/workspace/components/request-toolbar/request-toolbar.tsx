@@ -28,6 +28,7 @@ import {
   reconcilePathParamRows,
   substitutePathParams,
 } from "./utils";
+import { resolveEffectiveAuth } from "../../utils/resolve-effective-auth";
 import { nanoid } from "nanoid";
 import {
   applyEnvironmentMutations,
@@ -251,9 +252,11 @@ export function RequestToolbar({ tab }: Props) {
         {},
       );
 
-      if (tab.auth.type === "bearer" && tab.auth.bearerToken.trim()) {
+      const collection = useCollectionsStore.getState().collectionsById[tab.collectionId];
+      const effectiveAuth = resolveEffectiveAuth(tab.auth, collection?.auth);
+      if (effectiveAuth.type === "bearer" && effectiveAuth.bearerToken.trim()) {
         resolvedHeaders.Authorization = `Bearer ${resolveTemplate(
-          tab.auth.bearerToken,
+          effectiveAuth.bearerToken,
           variableMap,
           unresolvedVariables,
         )}`;

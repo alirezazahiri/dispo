@@ -84,3 +84,11 @@ func (s *Service) RenameRequest(input api.RenameRequestInput) error {
 func (s *Service) DuplicateRequest(input api.DeleteEntityInput) (api.SavedRequestPayload, error) {
 	return s.repo.DuplicateRequest(input.ID)
 }
+
+func (s *Service) UpdateCollectionAuth(input api.UpdateCollectionAuthInput) (api.CollectionPayload, error) {
+	return s.repo.UpdateCollectionAuth(input)
+}
+
+func (s *Service) ImportTree(tree api.CollectionTreePayload) (api.CollectionTreePayload, error) {
+	return s.repo.ImportTree(tree)
+}

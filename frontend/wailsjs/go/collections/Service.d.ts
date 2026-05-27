@@ -17,6 +17,8 @@ export function DeleteRequest(arg1:api.DeleteEntityInput):Promise<void>;
 
 export function DuplicateRequest(arg1:api.DeleteEntityInput):Promise<api.SavedRequestPayload>;
 
+export function ImportTree(arg1:api.CollectionTreePayload):Promise<api.CollectionTreePayload>;
+
 export function LoadAllCollections():Promise<Array<api.CollectionTreePayload>>;
 
 export function MoveFolder(arg1:api.MoveFolderInput):Promise<void>;
@@ -34,3 +36,5 @@ export function ReorderRequests(arg1:api.ReorderSavedRequestsInput):Promise<void
 export function SaveRequest(arg1:api.SavedRequestPayload):Promise<api.SavedRequestPayload>;
 
 export function Startup(arg1:context.Context):Promise<void>;
+
+export function UpdateCollectionAuth(arg1:api.UpdateCollectionAuthInput):Promise<api.CollectionPayload>;
