@@ -5,6 +5,7 @@ import (
 	"dispo/backend/api"
 	"dispo/backend/collections"
 	"dispo/backend/import/httpie"
+	"dispo/backend/import/postman"
 	"fmt"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ type Service struct {
 func NewService(collectionsService *collections.Service) *Service {
 	registry := NewRegistry()
 	registry.Register("httpie", httpie.Importer{})
+	registry.Register("postman", postman.Importer{})
 
 	return &Service{
 		registry:    registry,

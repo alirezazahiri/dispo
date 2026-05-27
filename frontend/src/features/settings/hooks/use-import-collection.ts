@@ -7,11 +7,15 @@ import { useCollectionsStore } from "@/features/collections/stores/collections.s
 import { useWorkspaceStore } from "@/features/workspace/stores/workspace.store";
 import type { KeyValuePair } from "@/features/workspace/types";
 
-type ImportSource = "httpie";
+type ImportSource = "httpie" | "postman";
 
 const FILE_FILTERS = {
   httpie: [
     { displayName: "HTTPie export", pattern: "*.json" },
+    { displayName: "All files", pattern: "*.*" },
+  ],
+  postman: [
+    { displayName: "Postman collection", pattern: "*.json" },
     { displayName: "All files", pattern: "*.*" },
   ],
 } satisfies Record<ImportSource, Array<{ displayName: string; pattern: string }>>;

@@ -1,5 +1,4 @@
 import { FileJson, FolderInput, Terminal } from "lucide-react";
-import { toast } from "sonner";
 
 import {
   DropdownMenuItem,
@@ -14,10 +13,6 @@ type ImportSource = {
   id: "postman" | "httpie";
   label: string;
   Icon: typeof FileJson;
-};
-
-const notifyComingSoon = (source: string) => {
-  toast.info(`Importing from ${source} is not implemented yet.`);
 };
 
 const IMPORT_SOURCES: ImportSource[] = [
@@ -41,15 +36,7 @@ export function ImportCollectionSubmenu() {
   const importCollection = useImportCollection();
 
   const handleImport = (source: ImportSource["id"]) => {
-    switch (source) {
-      case "httpie":
-        void importCollection("httpie");
-        break;
-      case "postman":
-      default:
-        notifyComingSoon("Postman");
-        break;
-    }
+    void importCollection(source);
   };
 
   return (

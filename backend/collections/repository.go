@@ -358,8 +358,34 @@ func (r *Repository) ImportTree(tree api.CollectionTreePayload) (api.CollectionT
 
 	imported := api.CollectionTreePayload{
 		Collection:    collection,
-		Folders:       []api.FolderPayload{},
+		Folders:       make([]api.FolderPayload, 0, len(tree.Folders)),
 		SavedRequests: make([]api.SavedRequestPayload, 0, len(tree.SavedRequests)),
+	}
+
+	for index, folder := range tree.Folders {
+		if strings.TrimSpace(folder.ID) == "" {
+			folder.ID = newID()
+		}
+		folder.CollectionID = collection.ID
+		folder.ParentFolderID = nil
+		folder.SortOrder = index
+		folder.CreatedAt = now
+		folder.UpdatedAt = now
+
+		_, err = tx.Exec(
+			`INSERT INTO folders (id, collection_id, parent_folder_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			folder.ID,
+			folder.CollectionID,
+			folder.ParentFolderID,
+			folder.Name,
+			folder.SortOrder,
+			folder.CreatedAt,
+			folder.UpdatedAt,
+		)
+		if err != nil {
+			return api.CollectionTreePayload{}, fmt.Errorf("insert imported folder: %w", err)
+		}
+		imported.Folders = append(imported.Folders, folder)
 	}
 
 	for index, request := range tree.SavedRequests {

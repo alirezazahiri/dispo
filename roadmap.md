@@ -5,5 +5,5 @@
 - [x] add environment variables support [HIGH]
 - [x] add response cookies table [HIGH]
 - [x] add pre-request and post-response script support PER REQUEST (each workspace-tab has its own script) [MEDIUM]
-- [ ] add settings drawer [LOW]
+- [x] add settings menu [LOW]
 - [ ] make architecture decisions on how to support multiple protocols [LOW]

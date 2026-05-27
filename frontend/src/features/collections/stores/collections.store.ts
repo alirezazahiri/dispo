@@ -9,7 +9,6 @@ import type {
   Folder,
   SavedRequest,
 } from "../types";
-import { isPresentAndNotEmpty } from "@/lib/utils";
 
 type CollectionsStore = {
   collectionsById: Record<string, Collection>;
@@ -24,7 +23,10 @@ type CollectionsStore = {
 
   createCollection: (name: string, description?: string) => Promise<Collection>;
   renameCollection: (id: string, name: string) => Promise<void>;
-  updateCollectionAuth: (id: string, auth: SavedRequest["auth"]) => Promise<void>;
+  updateCollectionAuth: (
+    id: string,
+    auth: SavedRequest["auth"],
+  ) => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
 
   createFolder: (
@@ -177,7 +179,10 @@ export const useCollectionsStore = create<CollectionsStore>()(
       },
 
       updateCollectionAuth: async (id, auth) => {
-        const updated = await backendClient.collections.updateCollectionAuth(id, auth);
+        const updated = await backendClient.collections.updateCollectionAuth(
+          id,
+          auth,
+        );
         set((state) => ({
           collectionsById: {
             ...state.collectionsById,
@@ -446,10 +451,8 @@ export const useCollectionsStore = create<CollectionsStore>()(
             requestId === id ? newFolderId : (current.folderId ?? null);
           const nextSortOrder = index;
           if (
-            isPresentAndNotEmpty(current.folderId)
-              ? current.folderId !== nextFolderId
-              : isPresentAndNotEmpty(newFolderId) ||
-                current.sortOrder !== nextSortOrder
+            (current.folderId ?? null) !== nextFolderId ||
+            current.sortOrder !== nextSortOrder
           ) {
             updates.push({
               id: requestId,
