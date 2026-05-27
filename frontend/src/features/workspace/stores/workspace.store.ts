@@ -12,6 +12,11 @@ import type {
   WorkspaceState,
 } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
+import {
+  normalizeTextBodyContentType,
+  resolveBodyContentType,
+  syncContentTypeHeader,
+} from "../components/request-editor/request-body-editor/utils";
 import { disposeSseTab } from "../protocols/sse/sse-runtime";
 import { resolveTabTitle } from "./tab-title";
 
@@ -470,13 +475,14 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
       );
       tab.savedRequestId = savedRequest.id;
       tab.title = savedRequest.name;
-      tab.method = savedRequest.method;
+      tab.method = savedRequest.method || tab.method;
       tab.url = savedRequest.url;
       tab.body = savedRequest.body;
       tab.bodyMode =
         savedRequest.bodyMode ?? (savedRequest.body ? "text" : "none");
-      tab.bodyContentType =
-        savedRequest.bodyContentType ?? tab.bodyContentType;
+      tab.bodyContentType = normalizeTextBodyContentType(
+        savedRequest.bodyContentType || tab.bodyContentType,
+      );
       tab.formSubtype = savedRequest.formSubtype ?? tab.formSubtype;
       tab.formFields = savedRequest.formFields ?? tab.formFields;
       tab.fileContentType =
@@ -487,7 +493,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         savedRequest.graphqlVariables ?? tab.graphqlVariables;
       tab.preRequestScript = savedRequest.preRequestScript;
       tab.postResponseScript = savedRequest.postResponseScript;
-      tab.headers = savedRequest.headers;
+      tab.headers = syncContentTypeHeader(
+        savedRequest.headers,
+        resolveBodyContentType(tab),
+      );
       tab.queryParams = savedRequest.queryParams;
       tab.pathParams = savedRequest.pathParams ?? [];
       tab.auth = savedRequest.auth;

@@ -76,4 +76,25 @@ func TestImporter_NESAuthenticationCollection(t *testing.T) {
 	if !foundUserID {
 		t.Fatal("expected userId path param from Postman URL variables")
 	}
+
+	for _, request := range tree.SavedRequests {
+		if request.Name != "login" {
+			continue
+		}
+		if request.Method != "POST" {
+			t.Fatalf("login method = %q, want POST", request.Method)
+		}
+		if request.BodyContentType != "application/json" {
+			t.Fatalf("login bodyContentType = %q, want application/json", request.BodyContentType)
+		}
+		contentType := ""
+		for _, header := range request.Headers {
+			if header.Key == "Content-Type" && header.Enabled {
+				contentType = header.Value
+			}
+		}
+		if contentType != "application/json" {
+			t.Fatalf("login Content-Type header = %q, want application/json", contentType)
+		}
+	}
 }

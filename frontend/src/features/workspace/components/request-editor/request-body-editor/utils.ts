@@ -1,11 +1,47 @@
 import { nanoid } from "nanoid";
 import { CONTENT_TYPE_HEADER_KEY } from "@/constants";
+import type { TextBodyContentType } from "@/types";
 import type {
   FormBodyField,
   KeyValuePair,
   RequestBodyMode,
   RequestTab,
 } from "../../../types";
+import { TEXT_CONTENT_TYPES } from "./constants";
+
+const TEXT_CONTENT_TYPE_ALIASES: Record<string, TextBodyContentType> = {
+  json: "application/json",
+  xml: "application/xml; charset=utf-8",
+  yaml: "text/yaml; charset=utf-8",
+  text: "text/plain; charset=utf-8",
+  "application/xml": "application/xml; charset=utf-8",
+  "text/plain": "text/plain; charset=utf-8",
+  "text/yaml": "text/yaml; charset=utf-8",
+};
+
+/**
+ * Maps shorthand or legacy mime labels to the canonical values used by the
+ * text body editor (e.g. HTTPie exports `format: "json"`).
+ */
+export function normalizeTextBodyContentType(
+  value: string | undefined,
+): TextBodyContentType {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) {
+    return "application/json";
+  }
+
+  const alias = TEXT_CONTENT_TYPE_ALIASES[trimmed.toLowerCase()];
+  if (alias) {
+    return alias;
+  }
+
+  if (TEXT_CONTENT_TYPES.includes(trimmed as TextBodyContentType)) {
+    return trimmed as TextBodyContentType;
+  }
+
+  return "application/json";
+}
 
 /**
  * Resolves the `Content-Type` header value implied by the tab's current
