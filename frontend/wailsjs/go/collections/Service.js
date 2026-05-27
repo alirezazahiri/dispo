@@ -30,6 +30,10 @@ export function DuplicateRequest(arg1) {
   return window['go']['collections']['Service']['DuplicateRequest'](arg1);
 }
 
+export function ImportTree(arg1) {
+  return window['go']['collections']['Service']['ImportTree'](arg1);
+}
+
 export function LoadAllCollections() {
   return window['go']['collections']['Service']['LoadAllCollections']();
 }
@@ -64,4 +68,8 @@ export function SaveRequest(arg1) {
 
 export function Startup(arg1) {
   return window['go']['collections']['Service']['Startup'](arg1);
+}
+
+export function UpdateCollectionAuth(arg1) {
+  return window['go']['collections']['Service']['UpdateCollectionAuth'](arg1);
 }

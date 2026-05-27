@@ -1,5 +1,13 @@
 import { Globe, Plus, Trash2 } from "lucide-react";
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components";
 import { KeyValueRowsEditor } from "@/components/shared";
 import {
   useActiveEnvironment,
@@ -12,6 +20,7 @@ import {
   useWorkspaceUpdateEnvironmentVariable,
   useWorkspaceRemoveEnvironmentVariable,
 } from "@/features/workspace/stores";
+import { buildTemplateValues } from "@/lib/utils";
 
 export function EnvironmentsPage() {
   const environments = useWorkspaceEnvironments();
@@ -32,8 +41,8 @@ export function EnvironmentsPage() {
           Environments
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Define reusable variables and choose the active environment for request template
-          resolution.
+          Define reusable variables and choose the active environment for
+          request template resolution.
         </p>
       </div>
 
@@ -60,7 +69,12 @@ export function EnvironmentsPage() {
             </Select>
           </div>
 
-          <Button type="button" variant="outline" size="icon" onClick={createEnvironment}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={createEnvironment}
+          >
             <Plus className="h-4 w-4" />
           </Button>
 
@@ -69,7 +83,9 @@ export function EnvironmentsPage() {
             variant="outline"
             size="icon"
             onClick={() =>
-              activeEnvironment ? deleteEnvironment(activeEnvironment.id) : undefined
+              activeEnvironment
+                ? deleteEnvironment(activeEnvironment.id)
+                : undefined
             }
             disabled={!activeEnvironment}
           >
@@ -106,6 +122,7 @@ export function EnvironmentsPage() {
               }
               keyPlaceholder="variable_name"
               valuePlaceholder="variable value"
+              templateValues={buildTemplateValues(activeEnvironment.variables)}
             />
           </div>
         ) : null}

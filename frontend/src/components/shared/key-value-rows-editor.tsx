@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button, Checkbox, Input } from "@/components";
+import { TemplateHighlightInput } from "./template-highlight-input";
 
 export type KeyValueRow = {
   id: string;
@@ -17,6 +18,11 @@ type Props = {
   keyPlaceholder?: string;
   valuePlaceholder?: string;
   emptyMessage?: string;
+  /**
+   * When provided, value cells highlight `{{variable}}` tokens and show
+   * resolved values from the active environment.
+   */
+  templateValues?: Record<string, string>;
 };
 
 export function KeyValueRowsEditor({
@@ -28,6 +34,7 @@ export function KeyValueRowsEditor({
   keyPlaceholder = "Key",
   valuePlaceholder = "Value",
   emptyMessage = "No rows yet. Add one to get started.",
+  templateValues,
 }: Props) {
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -75,15 +82,29 @@ export function KeyValueRowsEditor({
                 placeholder={keyPlaceholder}
               />
 
-              <Input
-                value={row.value}
-                onChange={(event) =>
-                  onUpdateRow(row.id, {
-                    value: event.target.value,
-                  })
-                }
-                placeholder={valuePlaceholder}
-              />
+              {templateValues ? (
+                <TemplateHighlightInput
+                  value={row.value}
+                  onChange={(value) =>
+                    onUpdateRow(row.id, {
+                      value,
+                    })
+                  }
+                  placeholder={valuePlaceholder}
+                  previewLabel="Template variable"
+                  templateValues={templateValues}
+                />
+              ) : (
+                <Input
+                  value={row.value}
+                  onChange={(event) =>
+                    onUpdateRow(row.id, {
+                      value: event.target.value,
+                    })
+                  }
+                  placeholder={valuePlaceholder}
+                />
+              )}
 
               <Button
                 variant="ghost"

@@ -38,6 +38,11 @@ export const backendClient = {
       CollectionsService.CreateCollection({ name, description }) as Promise<CollectionPayload>,
     renameCollection: (id: string, name: string) =>
       CollectionsService.RenameCollection({ id, name }) as Promise<void>,
+    updateCollectionAuth: (
+      id: string,
+      auth: { type: string; bearerToken: string },
+    ) =>
+      CollectionsService.UpdateCollectionAuth({ id, auth } as any) as Promise<CollectionPayload>,
     deleteCollection: (id: string) =>
       CollectionsService.DeleteCollection({ id }) as Promise<void>,
     createFolder: (collectionId: string, name: string, parentFolderId: string | null = null) =>

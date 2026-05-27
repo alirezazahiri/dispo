@@ -2,3 +2,5 @@ node_modules
 frontend/dist
 build/bin
 examples
+*.exe
+*.syso

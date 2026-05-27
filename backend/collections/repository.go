@@ -153,6 +153,21 @@ func (r *Repository) initSchema() error {
 		return err
 	}
 
+	if err := r.ensureColumnExists(
+		"collections",
+		"auth_type",
+		`ALTER TABLE collections ADD COLUMN auth_type TEXT NOT NULL DEFAULT 'none'`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"collections",
+		"bearer_token",
+		`ALTER TABLE collections ADD COLUMN bearer_token TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return err
+	}
+
 	now := time.Now().UnixMilli()
 	if _, err := r.db.Exec(
 		`INSERT OR IGNORE INTO collections (id, name, description, sort_order, created_at, updated_at) VALUES (?, ?, '', 0, ?, ?)`,
@@ -175,7 +190,7 @@ func (r *Repository) LoadAllCollections() ([]api.CollectionTreePayload, error) {
 	collections := make([]api.CollectionTreePayload, 0)
 
 	rows, err := r.db.Query(`
-		SELECT id, name, description, sort_order, created_at, updated_at
+		SELECT id, name, description, sort_order, auth_type, bearer_token, created_at, updated_at
 		FROM collections
 		ORDER BY sort_order ASC, created_at ASC
 	`)
@@ -191,6 +206,8 @@ func (r *Repository) LoadAllCollections() ([]api.CollectionTreePayload, error) {
 			&tree.Collection.Name,
 			&tree.Collection.Description,
 			&tree.Collection.SortOrder,
+			&tree.Collection.Auth.Type,
+			&tree.Collection.Auth.BearerToken,
 			&tree.Collection.CreatedAt,
 			&tree.Collection.UpdatedAt,
 		); err != nil {
@@ -225,16 +242,19 @@ func (r *Repository) CreateCollection(input api.CreateCollectionInput) (api.Coll
 		Name:        input.Name,
 		Description: input.Description,
 		SortOrder:   r.nextSortOrder("collections", "1=1"),
+		Auth:        api.RequestAuthPayload{Type: "none", BearerToken: ""},
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 
 	_, err := r.db.Exec(
-		`INSERT INTO collections (id, name, description, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO collections (id, name, description, sort_order, auth_type, bearer_token, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		collection.ID,
 		collection.Name,
 		collection.Description,
 		collection.SortOrder,
+		collection.Auth.Type,
+		collection.Auth.BearerToken,
 		collection.CreatedAt,
 		collection.UpdatedAt,
 	)
@@ -243,6 +263,205 @@ func (r *Repository) CreateCollection(input api.CreateCollectionInput) (api.Coll
 	}
 
 	return collection, nil
+}
+
+func (r *Repository) UpdateCollectionAuth(input api.UpdateCollectionAuthInput) (api.CollectionPayload, error) {
+	authType := strings.TrimSpace(input.Auth.Type)
+	if authType == "" {
+		authType = "none"
+	}
+	if authType == "inherited" {
+		return api.CollectionPayload{}, errors.New("collection auth cannot be inherited")
+	}
+
+	now := time.Now().UnixMilli()
+	result, err := r.db.Exec(
+		`UPDATE collections SET auth_type = ?, bearer_token = ?, updated_at = ? WHERE id = ?`,
+		authType,
+		input.Auth.BearerToken,
+		now,
+		input.ID,
+	)
+	if err != nil {
+		return api.CollectionPayload{}, fmt.Errorf("update collection auth: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return api.CollectionPayload{}, fmt.Errorf("check collection auth update: %w", err)
+	}
+	if affected == 0 {
+		return api.CollectionPayload{}, fmt.Errorf("collection not found: %s", input.ID)
+	}
+
+	var collection api.CollectionPayload
+	err = r.db.QueryRow(`
+		SELECT id, name, description, sort_order, auth_type, bearer_token, created_at, updated_at
+		FROM collections
+		WHERE id = ?
+	`, input.ID).Scan(
+		&collection.ID,
+		&collection.Name,
+		&collection.Description,
+		&collection.SortOrder,
+		&collection.Auth.Type,
+		&collection.Auth.BearerToken,
+		&collection.CreatedAt,
+		&collection.UpdatedAt,
+	)
+	if err != nil {
+		return api.CollectionPayload{}, fmt.Errorf("load updated collection: %w", err)
+	}
+
+	return collection, nil
+}
+
+func (r *Repository) ImportTree(tree api.CollectionTreePayload) (api.CollectionTreePayload, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return api.CollectionTreePayload{}, fmt.Errorf("begin import transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	now := time.Now().UnixMilli()
+	collection := tree.Collection
+	if strings.TrimSpace(collection.ID) == "" {
+		collection.ID = newID()
+	}
+	collection.SortOrder = r.nextSortOrder("collections", "1=1")
+	collection.CreatedAt = now
+	collection.UpdatedAt = now
+	if strings.TrimSpace(collection.Auth.Type) == "" {
+		collection.Auth.Type = "none"
+	}
+	if collection.Auth.Type == "inherited" {
+		collection.Auth.Type = "none"
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO collections (id, name, description, sort_order, auth_type, bearer_token, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		collection.ID,
+		collection.Name,
+		collection.Description,
+		collection.SortOrder,
+		collection.Auth.Type,
+		collection.Auth.BearerToken,
+		collection.CreatedAt,
+		collection.UpdatedAt,
+	)
+	if err != nil {
+		return api.CollectionTreePayload{}, fmt.Errorf("insert imported collection: %w", err)
+	}
+
+	imported := api.CollectionTreePayload{
+		Collection:    collection,
+		Folders:       []api.FolderPayload{},
+		SavedRequests: make([]api.SavedRequestPayload, 0, len(tree.SavedRequests)),
+	}
+
+	for index, request := range tree.SavedRequests {
+		request.CollectionID = collection.ID
+		request.SortOrder = index
+		saved, saveErr := r.saveRequestTx(tx, request)
+		if saveErr != nil {
+			err = saveErr
+			return api.CollectionTreePayload{}, saveErr
+		}
+		imported.SavedRequests = append(imported.SavedRequests, saved)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return api.CollectionTreePayload{}, fmt.Errorf("commit import transaction: %w", err)
+	}
+
+	return imported, nil
+}
+
+func (r *Repository) saveRequestTx(
+	tx *sql.Tx,
+	payload api.SavedRequestPayload,
+) (api.SavedRequestPayload, error) {
+	now := time.Now().UnixMilli()
+	if strings.TrimSpace(payload.ID) == "" {
+		payload.ID = newID()
+	}
+	payload.CreatedAt = now
+	payload.UpdatedAt = now
+	if strings.TrimSpace(payload.Auth.Type) == "" {
+		payload.Auth.Type = "none"
+	}
+
+	bodyMetaJSON, err := api.MarshalBodyMeta(bodyMetaFromSavedRequest(payload))
+	if err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("marshal body meta: %w", err)
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO saved_requests (id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		payload.ID,
+		payload.CollectionID,
+		payload.FolderID,
+		payload.Name,
+		payload.Method,
+		payload.URL,
+		payload.Body,
+		bodyMetaJSON,
+		payload.PreRequestScript,
+		payload.PostResponseScript,
+		payload.Auth.Type,
+		payload.Auth.BearerToken,
+		payload.SortOrder,
+		payload.CreatedAt,
+		payload.UpdatedAt,
+	)
+	if err != nil {
+		return api.SavedRequestPayload{}, fmt.Errorf("insert imported request: %w", err)
+	}
+
+	if err := r.replaceRequestRowsTx(tx, "saved_request_headers", payload.ID, payload.Headers); err != nil {
+		return api.SavedRequestPayload{}, err
+	}
+	if err := r.replaceRequestRowsTx(tx, "saved_request_query_params", payload.ID, payload.QueryParams); err != nil {
+		return api.SavedRequestPayload{}, err
+	}
+	if err := r.replaceRequestRowsTx(tx, "saved_request_path_params", payload.ID, payload.PathParams); err != nil {
+		return api.SavedRequestPayload{}, err
+	}
+
+	return payload, nil
+}
+
+func (r *Repository) replaceRequestRowsTx(
+	tx *sql.Tx,
+	table string,
+	requestID string,
+	rows []api.KeyValuePayload,
+) error {
+	if _, err := tx.Exec(fmt.Sprintf(`DELETE FROM %s WHERE saved_request_id = ?`, table), requestID); err != nil {
+		return fmt.Errorf("clear %s rows: %w", table, err)
+	}
+
+	for index, row := range rows {
+		if strings.TrimSpace(row.ID) == "" {
+			row.ID = newID()
+		}
+		if _, err := tx.Exec(
+			fmt.Sprintf(`INSERT INTO %s (id, saved_request_id, position, key_name, value, enabled) VALUES (?, ?, ?, ?, ?, ?)`, table),
+			row.ID,
+			requestID,
+			index,
+			row.Key,
+			row.Value,
+			boolToInt(row.Enabled),
+		); err != nil {
+			return fmt.Errorf("insert %s row: %w", table, err)
+		}
+	}
+
+	return nil
 }
 
 func (r *Repository) RenameCollection(input api.RenameCollectionInput) error {

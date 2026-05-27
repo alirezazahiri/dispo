@@ -27,6 +27,9 @@ import type { KeyValuePair, RequestAuthType } from "../../types";
 import { ScriptsTab } from "./scripts-tab";
 import { RequestBodyEditor } from "./request-body-editor";
 import { extractPathParamNames } from "../request-toolbar/utils";
+import { useCollectionsStore } from "@/features/collections/stores/collections.store";
+import { resolveEffectiveAuth } from "../../utils/resolve-effective-auth";
+import { buildTemplateValues } from "@/lib/utils";
 
 type Props = {
   tab: RequestTab;
@@ -35,8 +38,15 @@ type Props = {
 export function RequestEditor({ tab }: Props) {
   const updateTab = useWorkspaceUpdateTab();
   const activeEnvironment = useActiveEnvironment();
+  const collection = useCollectionsStore(
+    (state) => state.collectionsById[tab.collectionId],
+  );
   const templateValues = buildTemplateValues(
     activeEnvironment?.variables ?? [],
+  );
+  const effectiveAuth = resolveEffectiveAuth(
+    tab.auth,
+    collection?.auth,
   );
 
   const updateKeyValueRows = (
@@ -295,6 +305,7 @@ export function RequestEditor({ tab }: Props) {
             onAddRow={handleAddHeader}
             onUpdateRow={handleUpdateHeader}
             onRemoveRow={handleRemoveHeader}
+            templateValues={templateValues}
           />
         </TabsContent>
 
@@ -312,6 +323,7 @@ export function RequestEditor({ tab }: Props) {
               onAddRow={handleAddPathParam}
               onUpdateRow={handleUpdatePathParam}
               onRemoveRow={handleRemovePathParam}
+              templateValues={templateValues}
             />
 
             <KeyValueRowsEditor
@@ -320,6 +332,7 @@ export function RequestEditor({ tab }: Props) {
               onAddRow={handleAddParam}
               onUpdateRow={handleUpdateParam}
               onRemoveRow={handleRemoveParam}
+              templateValues={templateValues}
             />
           </div>
         </TabsContent>
@@ -341,11 +354,28 @@ export function RequestEditor({ tab }: Props) {
                   <SelectValue placeholder="Select auth type" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="inherited">Inherited</SelectItem>
                   <SelectItem value="none">No Auth</SelectItem>
                   <SelectItem value="bearer">Bearer Token</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {tab.auth.type === "inherited" ? (
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                Uses collection auth:{" "}
+                <span className="font-medium text-foreground">
+                  {effectiveAuth.type === "bearer"
+                    ? "Bearer Token"
+                    : "No Auth"}
+                </span>
+                {effectiveAuth.type === "bearer" && effectiveAuth.bearerToken ? (
+                  <div className="mt-2 font-mono text-xs break-all">
+                    {effectiveAuth.bearerToken}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {tab.auth.type === "bearer" && (
               <div className="space-y-2">
@@ -380,16 +410,6 @@ export function RequestEditor({ tab }: Props) {
   );
 }
 
-function buildTemplateValues(variables: KeyValuePair[]) {
-  return variables.reduce<Record<string, string>>((acc, variable) => {
-    const key = variable.key.trim();
-    if (variable.enabled && key) {
-      acc[key] = variable.value;
-    }
-    return acc;
-  }, {});
-}
-
 type PathParamsSectionProps = {
   rows: KeyValuePair[];
   urlNames: Set<string>;
@@ -406,7 +426,10 @@ function PathParamsSection({
   onAddRow,
   onUpdateRow,
   onRemoveRow,
-}: PathParamsSectionProps) {
+  templateValues,
+}: PathParamsSectionProps & {
+  templateValues: Record<string, string>;
+}) {
   return (
     <div className="border-b border-border">
       <div className="border-b border-border px-4 py-3 flex items-center justify-between gap-3">
@@ -491,16 +514,16 @@ function PathParamsSection({
                   placeholder="Key"
                 />
 
-                <Input
+                <TemplateHighlightInput
                   value={row.value}
-                  onChange={(event) =>
-                    onUpdateRow(row.id, { value: event.target.value })
-                  }
+                  onChange={(value) => onUpdateRow(row.id, { value })}
                   placeholder={
                     row.key
                       ? `:${row.key} param value...`
                       : "Path param value..."
                   }
+                  previewLabel="Template variable"
+                  templateValues={templateValues}
                 />
 
                 <Button

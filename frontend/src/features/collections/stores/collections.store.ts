@@ -24,6 +24,7 @@ type CollectionsStore = {
 
   createCollection: (name: string, description?: string) => Promise<Collection>;
   renameCollection: (id: string, name: string) => Promise<void>;
+  updateCollectionAuth: (id: string, auth: SavedRequest["auth"]) => Promise<void>;
   deleteCollection: (id: string) => Promise<void>;
 
   createFolder: (
@@ -74,7 +75,10 @@ function normalizeTrees(trees: CollectionTree[]) {
   const requestsByCollection: Record<string, Record<string, SavedRequest>> = {};
 
   for (const tree of trees) {
-    const collection = tree.collection;
+    const collection = {
+      ...tree.collection,
+      auth: tree.collection.auth ?? { type: "none" as const, bearerToken: "" },
+    };
     collectionsById[collection.id] = collection;
     collectionOrder.push(collection.id);
 
@@ -167,6 +171,20 @@ export const useCollectionsStore = create<CollectionsStore>()(
             [id]: {
               ...state.collectionsById[id],
               name,
+            },
+          },
+        }));
+      },
+
+      updateCollectionAuth: async (id, auth) => {
+        const updated = await backendClient.collections.updateCollectionAuth(id, auth);
+        set((state) => ({
+          collectionsById: {
+            ...state.collectionsById,
+            [id]: {
+              ...state.collectionsById[id],
+              ...updated,
+              auth: updated.auth ?? auth,
             },
           },
         }));

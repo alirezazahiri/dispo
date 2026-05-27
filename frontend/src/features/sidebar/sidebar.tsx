@@ -41,6 +41,7 @@ import {
   type FolderDropData,
   type RequestDragData,
 } from "@/features/collections";
+import { CollectionAuthDialog } from "@/features/settings/components/collection-auth-dialog";
 import {
   useActiveCollectionId,
   useWorkspaceHandleRenamedSavedRequest,
@@ -139,6 +140,9 @@ export const Sidebar = () => {
   const renameCollection = useCollectionsStore(
     (state) => state.renameCollection,
   );
+  const updateCollectionAuth = useCollectionsStore(
+    (state) => state.updateCollectionAuth,
+  );
   const renameFolder = useCollectionsStore((state) => state.renameFolder);
   const renameRequest = useCollectionsStore((state) => state.renameRequest);
   const duplicateRequest = useCollectionsStore(
@@ -180,6 +184,9 @@ export const Sidebar = () => {
     id: string;
     name: string;
   } | null>(null);
+  const [collectionAuthTargetId, setCollectionAuthTargetId] = useState<
+    string | null
+  >(null);
   const [renameFolderTarget, setRenameFolderTarget] = useState<{
     collectionId: string;
     id: string;
@@ -464,6 +471,7 @@ export const Sidebar = () => {
                         name: collection.name,
                       })
                     }
+                    onConfigureAuth={() => setCollectionAuthTargetId(collection.id)}
                     onDeleteCollection={() =>
                       setDeleteCollectionId(collection.id)
                     }
@@ -544,6 +552,25 @@ export const Sidebar = () => {
           }
           await createFolder(createFolderCollectionId, name, null);
           setCreateFolderCollectionId(null);
+        }}
+      />
+      <CollectionAuthDialog
+        open={Boolean(collectionAuthTargetId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCollectionAuthTargetId(null);
+          }
+        }}
+        collection={
+          collectionAuthTargetId
+            ? collectionsById[collectionAuthTargetId] ?? null
+            : null
+        }
+        onSave={async (auth) => {
+          if (!collectionAuthTargetId) {
+            return;
+          }
+          await updateCollectionAuth(collectionAuthTargetId, auth);
         }}
       />
       <RenameDialog

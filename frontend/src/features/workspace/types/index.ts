@@ -32,7 +32,7 @@ export type KeyValuePair = {
   enabled: boolean;
 };
 
-export type RequestAuthType = "none" | "bearer";
+export type RequestAuthType = "none" | "bearer" | "inherited";
 
 export type RequestAuth = {
   type: RequestAuthType;

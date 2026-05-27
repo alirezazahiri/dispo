@@ -1,12 +1,18 @@
 package api
 
 type CollectionPayload struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	SortOrder   int    `json:"sortOrder"`
-	CreatedAt   int64  `json:"createdAt"`
-	UpdatedAt   int64  `json:"updatedAt"`
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	SortOrder   int                `json:"sortOrder"`
+	Auth        RequestAuthPayload `json:"auth"`
+	CreatedAt   int64              `json:"createdAt"`
+	UpdatedAt   int64              `json:"updatedAt"`
+}
+
+type UpdateCollectionAuthInput struct {
+	ID   string             `json:"id"`
+	Auth RequestAuthPayload `json:"auth"`
 }
 
 type FolderPayload struct {

@@ -1,7 +1,9 @@
 import type { RequestTab } from "../../types";
 import { CopyButton } from "@/components/shared";
+import { useCollectionsStore } from "@/features/collections/stores/collections.store";
 import type { RequestSnapshot } from "../../types/response";
 import { buildRequestBody } from "../request-editor/request-body-editor/utils";
+import { resolveEffectiveAuth } from "../../utils/resolve-effective-auth";
 
 type Props = {
   tab: RequestTab;
@@ -92,9 +94,11 @@ function buildRequestDetails(
 
   const body = buildRequestBody(tab);
 
+  const collection = useCollectionsStore.getState().collectionsById[tab.collectionId];
+  const effectiveAuth = resolveEffectiveAuth(tab.auth, collection?.auth);
   const authorization =
-    tab.auth.type === "bearer" && tab.auth.bearerToken.trim()
-      ? `Bearer ${tab.auth.bearerToken}`
+    effectiveAuth.type === "bearer" && effectiveAuth.bearerToken.trim()
+      ? `Bearer ${effectiveAuth.bearerToken}`
       : headersMap.authorization || "Not set";
 
   const userAgent = headersMap["user-agent"] || "Dispo/1.0";
