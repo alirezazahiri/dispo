@@ -12,6 +12,12 @@ import type {
   WorkspaceState,
 } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
+import {
+  normalizeTextBodyContentType,
+  resolveBodyContentType,
+  syncContentTypeHeader,
+} from "../components/request-editor/request-body-editor/utils";
+import { disposeSseTab } from "../protocols/sse/sse-runtime";
 import { resolveTabTitle } from "./tab-title";
 
 type WorkspaceLayout = "vertical" | "horizontal";
@@ -151,6 +157,14 @@ function sanitizeState(
       graphqlQuery: tab.graphqlQuery ?? template.graphqlQuery,
       graphqlVariables: tab.graphqlVariables ?? template.graphqlVariables,
       pathParams: tab.pathParams ?? template.pathParams,
+      sseConfig: {
+        ...template.sseConfig,
+        ...tab.sseConfig,
+      },
+      sseStream: {
+        ...template.sseStream,
+        ...tab.sseStream,
+      },
     };
   });
 
@@ -346,6 +360,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
       const tab = state.tabsById[tabId];
       if (!tab) return;
 
+      if (tab.protocol === "sse") {
+        disposeSseTab(tabId);
+      }
+
       const collectionId = tab.collectionId;
       const currentOrder = state.tabOrderByCollection[collectionId] ?? [];
       const nextOrder = currentOrder.filter((id) => id !== tabId);
@@ -451,16 +469,20 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         return;
       }
 
-      const tab = createWorkspaceTab("http", savedRequest.collectionId);
+      const tab = createWorkspaceTab(
+        savedRequest.protocol ?? "http",
+        savedRequest.collectionId,
+      );
       tab.savedRequestId = savedRequest.id;
       tab.title = savedRequest.name;
-      tab.method = savedRequest.method;
+      tab.method = savedRequest.method || tab.method;
       tab.url = savedRequest.url;
       tab.body = savedRequest.body;
       tab.bodyMode =
         savedRequest.bodyMode ?? (savedRequest.body ? "text" : "none");
-      tab.bodyContentType =
-        savedRequest.bodyContentType ?? tab.bodyContentType;
+      tab.bodyContentType = normalizeTextBodyContentType(
+        savedRequest.bodyContentType || tab.bodyContentType,
+      );
       tab.formSubtype = savedRequest.formSubtype ?? tab.formSubtype;
       tab.formFields = savedRequest.formFields ?? tab.formFields;
       tab.fileContentType =
@@ -471,7 +493,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         savedRequest.graphqlVariables ?? tab.graphqlVariables;
       tab.preRequestScript = savedRequest.preRequestScript;
       tab.postResponseScript = savedRequest.postResponseScript;
-      tab.headers = savedRequest.headers;
+      tab.headers = syncContentTypeHeader(
+        savedRequest.headers,
+        resolveBodyContentType(tab),
+      );
       tab.queryParams = savedRequest.queryParams;
       tab.pathParams = savedRequest.pathParams ?? [];
       tab.auth = savedRequest.auth;
@@ -527,6 +552,7 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         collectionId: targetCollectionId,
         folderId: targetFolderId,
         name: options?.name ?? canonicalTitle,
+        protocol: tab.protocol,
         method: tab.method,
         url: tab.url,
         bodyMode: tab.bodyMode,

@@ -125,6 +125,7 @@ export namespace api {
 	    collectionId: string;
 	    folderId?: string;
 	    name: string;
+	    protocol: string;
 	    method: string;
 	    url: string;
 	    bodyMode: string;
@@ -156,6 +157,7 @@ export namespace api {
 	        this.collectionId = source["collectionId"];
 	        this.folderId = source["folderId"];
 	        this.name = source["name"];
+	        this.protocol = source["protocol"];
 	        this.method = source["method"];
 	        this.url = source["url"];
 	        this.bodyMode = source["bodyMode"];
@@ -801,6 +803,42 @@ export namespace api {
 	}
 	
 	
+	export class SseConnectPayload {
+	    connectionId: string;
+	    tabId: string;
+	    url: string;
+	    headers: Record<string, string>;
+	    lastEventId?: string;
+	    withCredentials: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SseConnectPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connectionId = source["connectionId"];
+	        this.tabId = source["tabId"];
+	        this.url = source["url"];
+	        this.headers = source["headers"];
+	        this.lastEventId = source["lastEventId"];
+	        this.withCredentials = source["withCredentials"];
+	    }
+	}
+	export class SseConnectResult {
+	    connectionId: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SseConnectResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connectionId = source["connectionId"];
+	        this.error = source["error"];
+	    }
+	}
 	
 	export class UpdateCollectionAuthInput {
 	    id: string;

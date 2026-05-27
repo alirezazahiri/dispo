@@ -528,7 +528,7 @@ export const Sidebar = () => {
                   bg-popover px-2 py-1.5 text-sm text-foreground shadow-lg
                 `}
               >
-                <RequestMethodIcon method={activeDrag.method} />
+                <RequestMethodIcon method={activeDrag.method} protocol={activeDrag.protocol} />
                 <span className="min-w-0 flex-1 truncate">
                   {activeDrag.name}
                 </span>

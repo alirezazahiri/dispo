@@ -10,7 +10,7 @@ import {
   useWorkspaceUpdateTab,
 } from "@/features/workspace/stores";
 import { useCollectionsStore } from "@/features/collections";
-import { MethodBadge } from "@/components/shared";
+import { getProtocolDefinition } from "../../protocols/registry";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +43,7 @@ export function WorkspaceTabItem({ tab }: Props) {
   const [renameValue, setRenameValue] = useState(displayTitle);
 
   const isActive = activeTab?.id === tab.id;
+  const TabBadge = getProtocolDefinition(tab.protocol).TabBadge;
 
   const commitRename = async () => {
     const nextTitle = renameValue.trim();
@@ -84,7 +85,7 @@ export function WorkspaceTabItem({ tab }: Props) {
           }
         `}
       >
-        <MethodBadge method={tab.method} />
+        <TabBadge tab={tab} />
 
         {isRenaming ? (
           <Input

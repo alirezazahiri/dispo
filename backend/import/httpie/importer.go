@@ -3,6 +3,7 @@ package httpie
 import (
 	"crypto/rand"
 	"dispo/backend/api"
+	"dispo/backend/import/normalize"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -161,9 +162,7 @@ func mapHTTPieRequest(request requestEntry, sortOrder int) (api.SavedRequestPayl
 		UpdatedAt:          now,
 	}
 
-	if payload.Method == "" {
-		payload.Method = "GET"
-	}
+	normalize.Request(&payload)
 
 	return payload, warnings, nil
 }

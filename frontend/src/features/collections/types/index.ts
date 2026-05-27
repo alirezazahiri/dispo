@@ -5,6 +5,7 @@ import type {
   RequestAuth,
   RequestBodyMode,
   HttpMethod,
+  WorkspaceProtocol,
 } from "@/features/workspace/types";
 import type {
   FileBodyContentType,
@@ -83,6 +84,8 @@ export type SavedRequest = {
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
+
+  protocol: WorkspaceProtocol;
 };
 
 export type CollectionTree = {
@@ -110,4 +113,5 @@ export type RequestDragData = {
   folderId: string | null;
   name: string;
   method: HttpMethod;
+  protocol?: WorkspaceProtocol;
 };

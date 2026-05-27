@@ -146,6 +146,16 @@ const SelectSeparator = React.forwardRef<
 ));
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
 
+const SelectPrimitiveItem = SelectPrimitive.Item;
+SelectPrimitiveItem.displayName = SelectPrimitive.Item.displayName;
+
+const SelectPrimitiveItemText = SelectPrimitive.ItemText;
+SelectPrimitiveItemText.displayName = SelectPrimitive.ItemText.displayName;
+
+const SelectPrimitiveItemIndicator = SelectPrimitive.ItemIndicator;
+SelectPrimitiveItemIndicator.displayName = SelectPrimitive.ItemIndicator.displayName;
+
+
 export {
   Select,
   SelectGroup,
@@ -157,4 +167,7 @@ export {
   SelectSeparator,
   SelectScrollUpButton,
   SelectScrollDownButton,
+  SelectPrimitiveItem,
+  SelectPrimitiveItemText,
+  SelectPrimitiveItemIndicator,
 };

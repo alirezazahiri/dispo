@@ -42,6 +42,7 @@ export function RequestNode({
       folderId: request.folderId,
       name: request.name,
       method: request.method as HttpMethod,
+      protocol: request.protocol,
     }),
     [
       request.id,
@@ -49,6 +50,7 @@ export function RequestNode({
       request.folderId,
       request.name,
       request.method,
+      request.protocol,
     ],
   );
   const {
@@ -98,7 +100,7 @@ export function RequestNode({
         className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left text-sm"
         onClick={() => onOpenRequest(request)}
       >
-        <RequestMethodIcon method={request.method as HttpMethod} />
+        <RequestMethodIcon method={request.method as HttpMethod} protocol={request.protocol} />
         <span className="min-w-0 flex-1 truncate">{request.name}</span>
       </button>
       <DropdownMenu open={actionsOpen} onOpenChange={setActionsOpen}>
