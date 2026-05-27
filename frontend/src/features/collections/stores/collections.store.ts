@@ -94,7 +94,10 @@ function normalizeTrees(trees: CollectionTree[]) {
     requestsByCollection[collection.id] = tree.savedRequests.reduce<
       Record<string, SavedRequest>
     >((acc, request) => {
-      acc[request.id] = request;
+      acc[request.id] = {
+        ...request,
+        protocol: request.protocol ?? "http",
+      };
       return acc;
     }, {});
   }
@@ -333,6 +336,7 @@ export const useCollectionsStore = create<CollectionsStore>()(
           folderId: folderId ?? null,
           name,
           method: "GET",
+          protocol: "http",
           url: "",
           bodyMode: "none",
           body: "",

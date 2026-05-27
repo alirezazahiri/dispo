@@ -1,4 +1,4 @@
-import type { RequestTab } from "../../types";
+import type { RequestTab, KeyValuePair, RequestAuthType } from "../../types";
 import {
   Tabs,
   TabsContent,
@@ -15,20 +15,18 @@ import {
   TemplateHighlightInput,
 } from "@/components/shared";
 import { useActiveEnvironment, useWorkspaceUpdateTab } from "../../stores";
-import type { KeyValuePair, RequestAuthType } from "../../types";
-import { ScriptsTab } from "./scripts-tab";
-import { RequestBodyEditor } from "./request-body-editor";
-import { PathParamsSection } from "./path-params-section";
-import { extractPathParamNames } from "../request-toolbar/utils";
 import { useCollectionsStore } from "@/features/collections/stores/collections.store";
 import { resolveEffectiveAuth } from "../../utils/resolve-effective-auth";
 import { buildTemplateValues } from "@/lib/utils";
+import { PathParamsSection } from "../../components/request-editor/path-params-section";
+import { extractPathParamNames } from "../../components/request-toolbar/utils";
+import { SseOptionsEditor } from "./sse-options-editor";
 
 type Props = {
   tab: RequestTab;
 };
 
-export function RequestEditor({ tab }: Props) {
+export function SseRequestEditor({ tab }: Props) {
   const updateTab = useWorkspaceUpdateTab();
   const activeEnvironment = useActiveEnvironment();
   const collection = useCollectionsStore(
@@ -37,36 +35,20 @@ export function RequestEditor({ tab }: Props) {
   const templateValues = buildTemplateValues(
     activeEnvironment?.variables ?? [],
   );
-  const effectiveAuth = resolveEffectiveAuth(
-    tab.auth,
-    collection?.auth,
-  );
+  const effectiveAuth = resolveEffectiveAuth(tab.auth, collection?.auth);
 
   const updateKeyValueRows = (
     rows: KeyValuePair[],
     rowId: string,
     data: Partial<KeyValuePair>,
-  ) => {
-    return rows.map((row) =>
-      row.id === rowId
-        ? {
-            ...row,
-            ...data,
-          }
-        : row,
-    );
-  };
+  ) =>
+    rows.map((row) => (row.id === rowId ? { ...row, ...data } : row));
 
   const handleAddHeader = () => {
     updateTab(tab.id, {
       headers: [
         ...tab.headers,
-        {
-          id: crypto.randomUUID(),
-          key: "",
-          value: "",
-          enabled: true,
-        },
+        { id: crypto.randomUUID(), key: "", value: "", enabled: true },
       ],
       isDirty: true,
     });
@@ -90,12 +72,7 @@ export function RequestEditor({ tab }: Props) {
     updateTab(tab.id, {
       queryParams: [
         ...tab.queryParams,
-        {
-          id: crypto.randomUUID(),
-          key: "",
-          value: "",
-          enabled: true,
-        },
+        { id: crypto.randomUUID(), key: "", value: "", enabled: true },
       ],
       isDirty: true,
     });
@@ -119,21 +96,13 @@ export function RequestEditor({ tab }: Props) {
     updateTab(tab.id, {
       pathParams: [
         ...(tab.pathParams ?? []),
-        {
-          id: crypto.randomUUID(),
-          key: "",
-          value: "",
-          enabled: true,
-        },
+        { id: crypto.randomUUID(), key: "", value: "", enabled: true },
       ],
       isDirty: true,
     });
   };
 
-  const handleUpdatePathParam = (
-    rowId: string,
-    data: Partial<KeyValuePair>,
-  ) => {
+  const handleUpdatePathParam = (rowId: string, data: Partial<KeyValuePair>) => {
     updateTab(tab.id, {
       pathParams: updateKeyValueRows(tab.pathParams ?? [], rowId, data),
       isDirty: true,
@@ -148,11 +117,6 @@ export function RequestEditor({ tab }: Props) {
   };
 
   const pathParamRows = tab.pathParams ?? [];
-
-  // Names currently referenced as `:name` placeholders in the URL. Used
-  // to distinguish "active" rows (referenced from the URL) from "orphan"
-  // rows (defined but no longer referenced) so the user has a hint about
-  // which rows actually affect the next request.
   const urlPathParamNames = new Set(extractPathParamNames(tab.url));
   const orphanCount = pathParamRows.filter((row) => {
     const key = row.key.trim();
@@ -161,137 +125,51 @@ export function RequestEditor({ tab }: Props) {
 
   const handleAuthTypeChange = (type: RequestAuthType) => {
     updateTab(tab.id, {
-      auth: {
-        ...tab.auth,
-        type,
-      },
+      auth: { ...tab.auth, type },
       isDirty: true,
     });
   };
 
   const handleBearerTokenChange = (bearerToken: string) => {
     updateTab(tab.id, {
-      auth: {
-        ...tab.auth,
-        bearerToken,
-      },
-      isDirty: true,
-    });
-  };
-
-  const handlePreRequestScriptChange = (preRequestScript: string) => {
-    updateTab(tab.id, {
-      preRequestScript,
-      isDirty: true,
-    });
-  };
-
-  const handlePostResponseScriptChange = (postResponseScript: string) => {
-    updateTab(tab.id, {
-      postResponseScript,
+      auth: { ...tab.auth, bearerToken },
       isDirty: true,
     });
   };
 
   return (
-    <section
-      className="
-        flex min-h-0 h-full flex-1 flex-col
-        bg-[hsl(var(--editor))]
-      "
-    >
-      <Tabs
-        defaultValue="body"
-        className="
-          flex min-h-0 flex-1 flex-col
-        "
-      >
-        <div
-          className="
-            border-b border-border
-            bg-background px-4 py-2
-          "
-        >
-          <TabsList
-            className="
-              h-8 bg-transparent p-0
-            "
-          >
-            <TabsTrigger
-              value="body"
-              className="
-                h-8 rounded-md px-3
-                data-[state=active]:bg-accent
-                data-[state=active]:shadow-none
-              "
-            >
-              Body
-            </TabsTrigger>
-
+    <section className="flex min-h-0 h-full flex-1 flex-col bg-[hsl(var(--editor))]">
+      <Tabs defaultValue="headers" className="flex min-h-0 flex-1 flex-col">
+        <div className="border-b border-border bg-background px-4 py-2">
+          <TabsList className="h-8 bg-transparent p-0">
             <TabsTrigger
               value="headers"
-              className="
-                h-8 rounded-md px-3
-                data-[state=active]:bg-accent
-                data-[state=active]:shadow-none
-              "
+              className="h-8 rounded-md px-3 data-[state=active]:bg-accent data-[state=active]:shadow-none"
             >
               Headers
             </TabsTrigger>
-
             <TabsTrigger
               value="params"
-              className="
-                h-8 rounded-md px-3
-                data-[state=active]:bg-accent
-                data-[state=active]:shadow-none
-              "
+              className="h-8 rounded-md px-3 data-[state=active]:bg-accent data-[state=active]:shadow-none"
             >
               Params
             </TabsTrigger>
-
             <TabsTrigger
               value="auth"
-              className="
-                h-8 rounded-md px-3
-                data-[state=active]:bg-accent
-                data-[state=active]:shadow-none
-              "
+              className="h-8 rounded-md px-3 data-[state=active]:bg-accent data-[state=active]:shadow-none"
             >
               Auth
             </TabsTrigger>
-
             <TabsTrigger
-              value="scripts"
-              className="
-                h-8 rounded-md px-3
-                data-[state=active]:bg-accent
-                data-[state=active]:shadow-none
-              "
+              value="sse"
+              className="h-8 rounded-md px-3 data-[state=active]:bg-accent data-[state=active]:shadow-none"
             >
-              Scripts
+              SSE
             </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent
-          value="body"
-          className="
-            mt-0 min-h-0 flex-1
-            data-[state=inactive]:hidden
-          "
-        >
-          <div className="h-full w-full">
-            <RequestBodyEditor tab={tab} />
-          </div>
-        </TabsContent>
-
-        <TabsContent
-          value="headers"
-          className="
-            mt-0 min-h-0 flex-1
-          "
-        >
+        <TabsContent value="headers" className="mt-0 min-h-0 flex-1">
           <KeyValueRowsEditor
             title="Headers"
             rows={tab.headers}
@@ -302,12 +180,7 @@ export function RequestEditor({ tab }: Props) {
           />
         </TabsContent>
 
-        <TabsContent
-          value="params"
-          className="
-            mt-0 min-h-0 flex-1 overflow-auto
-          "
-        >
+        <TabsContent value="params" className="mt-0 min-h-0 flex-1 overflow-auto">
           <div className="flex flex-col">
             <PathParamsSection
               rows={pathParamRows}
@@ -329,19 +202,11 @@ export function RequestEditor({ tab }: Props) {
           </div>
         </TabsContent>
 
-        <TabsContent
-          value="auth"
-          className="
-            mt-0 min-h-0 flex-1
-          "
-        >
+        <TabsContent value="auth" className="mt-0 min-h-0 flex-1">
           <div className="p-4 flex flex-col gap-4 max-w-xl">
             <div className="space-y-2">
               <div className="text-sm font-medium">Auth Type</div>
-              <Select
-                value={tab.auth.type}
-                onValueChange={handleAuthTypeChange}
-              >
+              <Select value={tab.auth.type} onValueChange={handleAuthTypeChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select auth type" />
                 </SelectTrigger>
@@ -357,19 +222,12 @@ export function RequestEditor({ tab }: Props) {
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
                 Uses collection auth:{" "}
                 <span className="font-medium text-foreground">
-                  {effectiveAuth.type === "bearer"
-                    ? "Bearer Token"
-                    : "No Auth"}
+                  {effectiveAuth.type === "bearer" ? "Bearer Token" : "No Auth"}
                 </span>
-                {effectiveAuth.type === "bearer" && effectiveAuth.bearerToken ? (
-                  <div className="mt-2 font-mono text-xs break-all">
-                    {effectiveAuth.bearerToken}
-                  </div>
-                ) : null}
               </div>
             ) : null}
 
-            {tab.auth.type === "bearer" && (
+            {tab.auth.type === "bearer" ? (
               <div className="space-y-2">
                 <div className="text-sm font-medium">Bearer Token</div>
                 <TemplateHighlightInput
@@ -380,22 +238,12 @@ export function RequestEditor({ tab }: Props) {
                   templateValues={templateValues}
                 />
               </div>
-            )}
+            ) : null}
           </div>
         </TabsContent>
 
-        <TabsContent
-          value="scripts"
-          className="
-            mt-0 min-h-0 flex-1
-          "
-        >
-          <ScriptsTab
-            preRequestScript={tab.preRequestScript}
-            postResponseScript={tab.postResponseScript}
-            onPreRequestScriptChange={handlePreRequestScriptChange}
-            onPostResponseScriptChange={handlePostResponseScriptChange}
-          />
+        <TabsContent value="sse" className="mt-0 min-h-0 flex-1 overflow-auto">
+          <SseOptionsEditor tab={tab} />
         </TabsContent>
       </Tabs>
     </section>

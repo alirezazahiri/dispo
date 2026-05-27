@@ -4,6 +4,11 @@ import type {
   TextBodyContentType,
 } from "@/types";
 import type { ResponseData } from "./response";
+import type { SseConnectionConfig, SseStreamState } from "./sse";
+import { DEFAULT_SSE_CONFIG, DEFAULT_SSE_STREAM } from "./sse";
+
+export type { SseConnectionConfig, SseConnectionStatus, SseEventRecord, SseStreamState } from "./sse";
+export { DEFAULT_SSE_CONFIG, DEFAULT_SSE_STREAM } from "./sse";
 
 export type WorkspaceProtocol = "http" | "websocket" | "sse" | "grpc";
 
@@ -208,6 +213,16 @@ export type RequestTab = {
   pathParams: KeyValuePair[];
 
   auth: RequestAuth;
+
+  /**
+   * Protocol-specific configuration. Only meaningful when `protocol` matches.
+   */
+  sseConfig: SseConnectionConfig;
+
+  /**
+   * Live SSE stream buffer and connection metadata for this tab.
+   */
+  sseStream: SseStreamState;
 
   response?: ResponseData;
 

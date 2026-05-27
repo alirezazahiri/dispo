@@ -12,6 +12,7 @@ import type {
   WorkspaceState,
 } from "../types";
 import { createWorkspaceTab } from "../utils/create-workspace-tab";
+import { disposeSseTab } from "../protocols/sse/sse-runtime";
 import { resolveTabTitle } from "./tab-title";
 
 type WorkspaceLayout = "vertical" | "horizontal";
@@ -151,6 +152,14 @@ function sanitizeState(
       graphqlQuery: tab.graphqlQuery ?? template.graphqlQuery,
       graphqlVariables: tab.graphqlVariables ?? template.graphqlVariables,
       pathParams: tab.pathParams ?? template.pathParams,
+      sseConfig: {
+        ...template.sseConfig,
+        ...tab.sseConfig,
+      },
+      sseStream: {
+        ...template.sseStream,
+        ...tab.sseStream,
+      },
     };
   });
 
@@ -346,6 +355,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
       const tab = state.tabsById[tabId];
       if (!tab) return;
 
+      if (tab.protocol === "sse") {
+        disposeSseTab(tabId);
+      }
+
       const collectionId = tab.collectionId;
       const currentOrder = state.tabOrderByCollection[collectionId] ?? [];
       const nextOrder = currentOrder.filter((id) => id !== tabId);
@@ -451,7 +464,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         return;
       }
 
-      const tab = createWorkspaceTab("http", savedRequest.collectionId);
+      const tab = createWorkspaceTab(
+        savedRequest.protocol ?? "http",
+        savedRequest.collectionId,
+      );
       tab.savedRequestId = savedRequest.id;
       tab.title = savedRequest.name;
       tab.method = savedRequest.method;
@@ -527,6 +543,7 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         collectionId: targetCollectionId,
         folderId: targetFolderId,
         name: options?.name ?? canonicalTitle,
+        protocol: tab.protocol,
         method: tab.method,
         url: tab.url,
         bodyMode: tab.bodyMode,

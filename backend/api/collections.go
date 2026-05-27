@@ -30,6 +30,7 @@ type SavedRequestPayload struct {
 	CollectionID       string                 `json:"collectionId"`
 	FolderID           *string                `json:"folderId,omitempty"`
 	Name               string                 `json:"name"`
+	Protocol           string                 `json:"protocol"`
 	Method             string                 `json:"method"`
 	URL                string                 `json:"url"`
 	BodyMode           string                 `json:"bodyMode"`

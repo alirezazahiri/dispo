@@ -90,6 +90,54 @@ export type HttpResponsePayload = {
   error?: string;
 };
 
+export type SseConnectPayload = {
+  connectionId: string;
+  tabId: string;
+  url: string;
+  headers: Record<string, string>;
+  lastEventId?: string;
+  withCredentials: boolean;
+};
+
+export type SseConnectResult = {
+  connectionId: string;
+  error?: string;
+};
+
+export type SseHeaderPayload = {
+  key: string;
+  value: string;
+};
+
+export type SseOpenEventPayload = {
+  connectionId: string;
+  tabId: string;
+  statusCode: number;
+  statusText: string;
+  headers: SseHeaderPayload[];
+  error?: string;
+};
+
+export type SseStreamEventPayload = {
+  connectionId: string;
+  tabId: string;
+  eventId?: string;
+  eventType?: string;
+  data: string;
+  retry?: number;
+};
+
+export type SseErrorEventPayload = {
+  connectionId: string;
+  tabId: string;
+  error: string;
+};
+
+export type SseCloseEventPayload = {
+  connectionId: string;
+  tabId: string;
+};
+
 export type WorkspaceStatePayload = WorkspaceState;
 export type CollectionTreePayload = CollectionTree;
 export type CollectionPayload = Collection;

@@ -93,6 +93,7 @@ func (r *Repository) initSchema() error {
 			collection_id TEXT NOT NULL,
 			folder_id TEXT,
 			name TEXT NOT NULL,
+			protocol TEXT NOT NULL DEFAULT 'http',
 			method TEXT NOT NULL,
 			url TEXT NOT NULL,
 			body TEXT NOT NULL DEFAULT '',
@@ -149,6 +150,13 @@ func (r *Repository) initSchema() error {
 		"saved_requests",
 		"body_meta_json",
 		`ALTER TABLE saved_requests ADD COLUMN body_meta_json TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		return err
+	}
+	if err := r.ensureColumnExists(
+		"saved_requests",
+		"protocol",
+		`ALTER TABLE saved_requests ADD COLUMN protocol TEXT NOT NULL DEFAULT 'http'`,
 	); err != nil {
 		return err
 	}
@@ -419,6 +427,9 @@ func (r *Repository) saveRequestTx(
 	if strings.TrimSpace(payload.Auth.Type) == "" {
 		payload.Auth.Type = "none"
 	}
+	if strings.TrimSpace(payload.Protocol) == "" {
+		payload.Protocol = "http"
+	}
 
 	bodyMetaJSON, err := api.MarshalBodyMeta(bodyMetaFromSavedRequest(payload))
 	if err != nil {
@@ -426,11 +437,12 @@ func (r *Repository) saveRequestTx(
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO saved_requests (id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO saved_requests (id, collection_id, folder_id, name, protocol, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		payload.ID,
 		payload.CollectionID,
 		payload.FolderID,
 		payload.Name,
+		payload.Protocol,
 		payload.Method,
 		payload.URL,
 		payload.Body,
@@ -523,8 +535,8 @@ func (r *Repository) CreateFolder(input api.CreateFolderInput) (api.FolderPayloa
 		Name:           input.Name,
 		// With max depth enforced, folder sort order is scoped to the collection root.
 		SortOrder: r.nextSortOrder("folders", "collection_id = ? AND parent_folder_id IS NULL", input.CollectionID),
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	_, err := r.db.Exec(
 		`INSERT INTO folders (id, collection_id, parent_folder_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -613,6 +625,9 @@ func (r *Repository) DeleteFolder(id string) error {
 func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequestPayload, error) {
 	now := time.Now().UnixMilli()
 	isCreate := payload.ID == ""
+	if strings.TrimSpace(payload.Protocol) == "" {
+		payload.Protocol = "http"
+	}
 	if isCreate {
 		payload.ID = newID()
 		payload.CreatedAt = now
@@ -637,17 +652,17 @@ func (r *Repository) SaveRequest(payload api.SavedRequestPayload) (api.SavedRequ
 
 	if isCreate {
 		_, err = tx.Exec(
-			`INSERT INTO saved_requests (id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			payload.ID, payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body, bodyMetaJSON,
+			`INSERT INTO saved_requests (id, collection_id, folder_id, name, protocol, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			payload.ID, payload.CollectionID, payload.FolderID, payload.Name, payload.Protocol, payload.Method, payload.URL, payload.Body, bodyMetaJSON,
 			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
 			payload.SortOrder, payload.CreatedAt, payload.UpdatedAt,
 		)
 	} else {
 		_, err = tx.Exec(
 			`UPDATE saved_requests
-			 SET collection_id = ?, folder_id = ?, name = ?, method = ?, url = ?, body = ?, body_meta_json = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = CASE WHEN ? < 0 THEN sort_order ELSE ? END, updated_at = ?
+			 SET collection_id = ?, folder_id = ?, name = ?, protocol = ?, method = ?, url = ?, body = ?, body_meta_json = ?, pre_request_script = ?, post_response_script = ?, auth_type = ?, bearer_token = ?, sort_order = CASE WHEN ? < 0 THEN sort_order ELSE ? END, updated_at = ?
 			 WHERE id = ?`,
-			payload.CollectionID, payload.FolderID, payload.Name, payload.Method, payload.URL, payload.Body, bodyMetaJSON,
+			payload.CollectionID, payload.FolderID, payload.Name, payload.Protocol, payload.Method, payload.URL, payload.Body, bodyMetaJSON,
 			payload.PreRequestScript, payload.PostResponseScript, payload.Auth.Type, payload.Auth.BearerToken,
 			payload.SortOrder, payload.SortOrder, payload.UpdatedAt, payload.ID,
 		)
@@ -778,11 +793,11 @@ func (r *Repository) loadSavedRequestByID(id string) (api.SavedRequestPayload, e
 	var request api.SavedRequestPayload
 	var bodyMetaJSON string
 	err := r.db.QueryRow(`
-		SELECT id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
+		SELECT id, collection_id, folder_id, name, protocol, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
 		FROM saved_requests
 		WHERE id = ?
 	`, id).Scan(
-		&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body, &bodyMetaJSON,
+		&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Protocol, &request.Method, &request.URL, &request.Body, &bodyMetaJSON,
 		&request.PreRequestScript, &request.PostResponseScript, &request.Auth.Type, &request.Auth.BearerToken,
 		&request.SortOrder, &request.CreatedAt, &request.UpdatedAt,
 	)
@@ -846,7 +861,7 @@ func (r *Repository) loadFolders(collectionID string) ([]api.FolderPayload, erro
 
 func (r *Repository) loadSavedRequests(collectionID string) ([]api.SavedRequestPayload, error) {
 	rows, err := r.db.Query(`
-		SELECT id, collection_id, folder_id, name, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
+		SELECT id, collection_id, folder_id, name, protocol, method, url, body, body_meta_json, pre_request_script, post_response_script, auth_type, bearer_token, sort_order, created_at, updated_at
 		FROM saved_requests
 		WHERE collection_id = ?
 		ORDER BY sort_order ASC, created_at ASC
@@ -861,7 +876,7 @@ func (r *Repository) loadSavedRequests(collectionID string) ([]api.SavedRequestP
 		var request api.SavedRequestPayload
 		var bodyMetaJSON string
 		if err := rows.Scan(
-			&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Method, &request.URL, &request.Body, &bodyMetaJSON,
+			&request.ID, &request.CollectionID, &request.FolderID, &request.Name, &request.Protocol, &request.Method, &request.URL, &request.Body, &bodyMetaJSON,
 			&request.PreRequestScript, &request.PostResponseScript, &request.Auth.Type, &request.Auth.BearerToken,
 			&request.SortOrder, &request.CreatedAt, &request.UpdatedAt,
 		); err != nil {
@@ -934,6 +949,9 @@ func bodyMetaFromSavedRequest(request api.SavedRequestPayload) api.BodyMetaPaylo
 }
 
 func applyBodyMetaToSavedRequest(request *api.SavedRequestPayload, meta api.BodyMetaPayload) {
+	if request.Protocol == "" {
+		request.Protocol = "http"
+	}
 	request.BodyMode = meta.BodyMode
 	request.BodyContentType = meta.BodyContentType
 	request.FormSubtype = meta.FormSubtype

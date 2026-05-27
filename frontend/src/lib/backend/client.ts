@@ -1,4 +1,5 @@
 import * as HttpService from "~/wailsjs/go/httpservice/HTTPService";
+import * as SseService from "~/wailsjs/go/sse/Service";
 import * as CollectionsService from "~/wailsjs/go/collections/Service";
 import type {
   CollectionPayload,
@@ -11,6 +12,8 @@ import type {
   SavedRequestPayload,
   ScriptContextPayload,
   ScriptResultPayload,
+  SseConnectPayload,
+  SseConnectResult,
   WorkspaceStatePayload,
 } from "./types";
 
@@ -32,6 +35,11 @@ export const backendClient = {
     (window as any).go.httpservice.HTTPService.SaveWorkspaceState(state) as Promise<void>,
   runScript: (context: ScriptContextPayload) =>
     (window as any).go.scripting.Service.RunScript(context) as Promise<ScriptResultPayload>,
+  sse: {
+    connect: (payload: SseConnectPayload) =>
+      SseService.Connect(payload as any) as Promise<SseConnectResult>,
+    disconnect: (connectionId: string) => SseService.Disconnect(connectionId),
+  },
   collections: {
     loadAll: () => CollectionsService.LoadAllCollections() as Promise<CollectionTreePayload[]>,
     createCollection: (name: string, description = "") =>

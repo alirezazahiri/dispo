@@ -1,6 +1,13 @@
 import { useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
-import { Button, Separator } from "@/components";
+import { Plus, Radio } from "lucide-react";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Separator,
+} from "@/components";
 import { DragScrollArea } from "@/components/shared";
 import { useDebouncedCallback } from "@/hooks";
 import {
@@ -95,19 +102,31 @@ export function WorkspaceTabs() {
           "
         />
 
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => createTab()}
-          className="
-            ml-1 h-8 w-8 shrink-0
-            text-muted-foreground
-            hover:bg-accent
-            hover:text-foreground
-          "
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="
+                ml-1 h-8 w-8 shrink-0
+                text-muted-foreground
+                hover:bg-accent
+                hover:text-foreground
+              "
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => createTab("http")}>
+              New HTTP Request
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => createTab("sse")}>
+              <Radio className="mr-2 h-3.5 w-3.5 text-violet-500" />
+              New SSE Stream
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Separator />

@@ -1,5 +1,10 @@
 import { nanoid } from "nanoid";
-import { RequestTab, WorkspaceProtocol } from "../types";
+import {
+  DEFAULT_SSE_CONFIG,
+  DEFAULT_SSE_STREAM,
+  RequestTab,
+  WorkspaceProtocol,
+} from "../types";
 
 export const createWorkspaceTab = (
   protocol: WorkspaceProtocol = "http",
@@ -52,6 +57,10 @@ export const createWorkspaceTab = (
       type: "none",
       bearerToken: "",
     },
+
+    sseConfig: { ...DEFAULT_SSE_CONFIG },
+
+    sseStream: { ...DEFAULT_SSE_STREAM },
 
     isSending: false,
 

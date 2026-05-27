@@ -7,14 +7,14 @@ import {
 
 import type { RequestTab } from "../../types";
 
-import { RequestEditor } from "../request-editor/request-editor";
-import { ResponsePanel } from "../response-panel";
+import { getProtocolDefinition } from "../../protocols/registry";
 
 type Props = {
   tab: RequestTab;
 };
 
 export function WorkspacePanels({ tab }: Props) {
+  const { Editor, ResponsePanel } = getProtocolDefinition(tab.protocol);
   const isVertical = tab.layout === "vertical";
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
@@ -31,7 +31,7 @@ export function WorkspacePanels({ tab }: Props) {
       onLayoutChange={onLayoutChanged}
     >
       <Panel defaultSize={55} minSize="20%" className="min-h-0 min-w-0">
-        <RequestEditor tab={tab} />
+        <Editor tab={tab} />
       </Panel>
 
       <ResizeHandle vertical={isVertical} />
