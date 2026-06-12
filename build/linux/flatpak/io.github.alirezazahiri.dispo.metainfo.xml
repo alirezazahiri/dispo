@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.alirezazahiri.dispo</id>
+  <name>dispo</name>
+  <summary>API client for HTTP, SSE, and WebSocket</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      dispo is a desktop API client for sending HTTP requests, streaming SSE events,
+      and working with WebSocket connections. Organize requests in collections,
+      manage environments, and inspect responses.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.alirezazahiri.dispo.desktop</launchable>
+  <url type="homepage">https://github.com/alirezazahiri/dispo</url>
+  <url type="bugtracker">https://github.com/alirezazahiri/dispo/issues</url>
+  <url type="vcs-browser">https://github.com/alirezazahiri/dispo</url>
+  <developer_name>alirezazahiri</developer_name>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.0.0" date="2026-06-12">
+      <description>
+        <p>Initial Flatpak release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

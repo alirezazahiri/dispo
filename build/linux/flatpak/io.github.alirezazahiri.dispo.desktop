@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=dispo
+Comment=API client for HTTP, SSE, and WebSocket
+Exec=dispo
+Icon=io.github.alirezazahiri.dispo
+Terminal=false
+Type=Application
+Categories=Development;Network;
+StartupWMClass=dispo
