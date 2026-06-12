@@ -26,7 +26,7 @@ export function UrlInput({
       value={value}
       onChange={onChange}
       placeholder="https://api.example.com/users/:userId"
-      className="w-full"
+      className="min-w-0 w-full [&_input]:h-9"
       templateValues={templateValues}
       pathParamValues={pathParamValues}
     />

@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Radio, Trash2 } from "lucide-react";
 import { Button } from "@/components";
+import { TOOLBAR_CONTROL_HEIGHT } from "../../components/request-toolbar/constants";
 import type { RequestTab, SseEventRecord } from "../../types";
-import { formatBytes } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 
 type Props = {
   tab: RequestTab;
@@ -137,8 +138,7 @@ export function SseStreamPanelActions({
     <div className="flex items-center gap-2">
       <Button
         variant="ghost"
-        size="sm"
-        className="gap-1.5"
+        className={cn("gap-1.5", TOOLBAR_CONTROL_HEIGHT)}
         disabled={tab.sseStream.events.length === 0 && tab.sseStream.status === "idle"}
         onClick={onClear}
       >

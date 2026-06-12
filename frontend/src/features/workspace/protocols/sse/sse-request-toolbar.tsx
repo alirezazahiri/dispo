@@ -1,8 +1,8 @@
 import { Loader2, Plug, PlugZap, Radio, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components";
+import { cn } from "@/lib/utils";
 import type { RequestTab } from "../../types";
-import { DEFAULT_SSE_STREAM } from "../../types";
 import {
   useActiveEnvironment,
   useWorkspaceEnvironments,
@@ -14,6 +14,16 @@ import { useCollectionsStore } from "@/features/collections";
 import { UrlInput } from "../../components/request-toolbar/url-input";
 import { ProtocolSelect } from "../../components/request-toolbar/protocol-select";
 import { EnvironmentSelect } from "../../components/request-toolbar/enironment-select";
+import { RequestToolbarShell } from "../../components/request-toolbar/request-toolbar-shell";
+import {
+  RequestToolbarOverflowMenu,
+  SseClearOverflowItem,
+} from "../../components/request-toolbar/request-toolbar-overflow-menu";
+import { ToolbarResponsiveButton } from "../../components/request-toolbar/toolbar-responsive-button";
+import {
+  TOOLBAR_CONTROL_HEIGHT,
+  TOOLBAR_ICON_BUTTON,
+} from "../../components/request-toolbar/constants";
 import type { WorkspaceProtocol } from "../../types";
 import {
   createVariableMap,
@@ -130,77 +140,104 @@ export function SseRequestToolbar({ tab, onProtocolChange }: Props) {
   };
 
   const isBusy = tab.isSending || tab.sseStream.status === "connecting";
+  const showSave = tab.isDirty || !tab.savedRequestId;
+  const canClearStream =
+    tab.sseStream.events.length > 0 || tab.sseStream.status !== "idle";
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-4">
-      <ProtocolSelect value={tab.protocol} onChange={onProtocolChange} />
+    <RequestToolbarShell
+      leading={
+        <>
+          <ProtocolSelect value={tab.protocol} onChange={onProtocolChange} />
 
-      <div
-        className="
-          flex h-9 w-[5.5rem] shrink-0 items-center justify-center gap-1.5
-          rounded-md border border-violet-500/30 bg-violet-500/10
-          font-mono text-xs font-semibold uppercase tracking-wide
-          text-violet-700 dark:text-violet-300
-        "
-      >
-        <Radio className="h-3.5 w-3.5" />
-        SSE
-      </div>
+          <div
+            className={cn(
+              TOOLBAR_ICON_BUTTON,
+              "flex items-center justify-center rounded-md border border-violet-500/30 bg-violet-500/10",
+              "text-violet-700 dark:text-violet-300",
+              "@workspace-compact/workspace:w-[5.5rem] @workspace-compact/workspace:gap-1.5",
+              "@workspace-compact/workspace:font-mono @workspace-compact/workspace:text-xs",
+              "@workspace-compact/workspace:font-semibold @workspace-compact/workspace:uppercase",
+              "@workspace-compact/workspace:tracking-wide",
+            )}
+          >
+            <Radio className="h-3.5 w-3.5" />
+            <span className="hidden @workspace-compact/workspace:inline">SSE</span>
+          </div>
+        </>
+      }
+      url={
+        <UrlInput
+          value={tab.url}
+          onChange={handleUrlChange}
+          templateValues={templateValues}
+          pathParamValues={pathParamValues}
+        />
+      }
+      secondary={
+        <>
+          <EnvironmentSelect
+            environments={environments}
+            activeEnvironmentId={activeEnvironment?.id}
+            onSelect={setActiveEnvironment}
+          />
 
-      <UrlInput
-        value={tab.url}
-        onChange={handleUrlChange}
-        templateValues={templateValues}
-        pathParamValues={pathParamValues}
-      />
+          <SseStreamPanelActions tab={tab} onClear={handleClear} />
 
-      <EnvironmentSelect
-        environments={environments}
-        activeEnvironmentId={activeEnvironment?.id}
-        onSelect={setActiveEnvironment}
-      />
-
-      <SseStreamPanelActions
-        tab={tab}
-        onClear={handleClear}
-      />
-
-      {(tab.isDirty || !tab.savedRequestId) && (
-        <Button variant="outline" onClick={() => void handleSave()} className="gap-2">
-          <Save className="h-4 w-4" />
-          Save
-        </Button>
-      )}
-
-      {isConnected ? (
-        <Button
-          variant="outline"
-          onClick={handleDisconnect}
-          disabled={isBusy}
-          className="min-w-[110px] gap-2"
-        >
-          <PlugZap className="h-4 w-4" />
-          Disconnect
-        </Button>
-      ) : (
-        <Button
-          onClick={() => void handleConnect()}
-          disabled={isBusy}
-          className="min-w-[110px] gap-2"
-        >
-          {isBusy ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Connecting
-            </>
-          ) : (
-            <>
-              <Plug className="h-4 w-4" />
-              Connect
-            </>
-          )}
-        </Button>
-      )}
-    </div>
+          {showSave ? (
+            <Button
+              variant="outline"
+              onClick={() => void handleSave()}
+              className={cn("gap-2 shadow-none hover:shadow-none", TOOLBAR_CONTROL_HEIGHT)}
+            >
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+          ) : null}
+        </>
+      }
+      primaryAction={
+        isConnected ? (
+          <ToolbarResponsiveButton
+            variant="outline"
+            onClick={handleDisconnect}
+            disabled={isBusy}
+            ariaLabel="Disconnect stream"
+            tooltip="Disconnect"
+            icon={<PlugZap className="h-4 w-4" />}
+            label="Disconnect"
+            wideClassName="@workspace-compact/workspace:min-w-[110px]"
+          />
+        ) : (
+          <ToolbarResponsiveButton
+            onClick={() => void handleConnect()}
+            disabled={isBusy}
+            ariaLabel="Connect to stream"
+            tooltip="Connect"
+            icon={<Plug className="h-4 w-4" />}
+            label="Connect"
+            isLoading={isBusy}
+            loadingIcon={<Loader2 className="h-4 w-4 animate-spin" />}
+            loadingLabel="Connecting"
+            wideClassName="@workspace-compact/workspace:min-w-[110px]"
+          />
+        )
+      }
+      overflow={
+        <RequestToolbarOverflowMenu
+          environments={environments}
+          activeEnvironmentId={activeEnvironment?.id}
+          onSelectEnvironment={setActiveEnvironment}
+          showSave={showSave}
+          onSave={() => void handleSave()}
+          extraItems={
+            <SseClearOverflowItem
+              disabled={!canClearStream}
+              onClear={handleClear}
+            />
+          }
+        />
+      }
+    />
   );
 }

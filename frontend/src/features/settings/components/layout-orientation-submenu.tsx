@@ -20,8 +20,8 @@ type LayoutOption = {
 };
 
 const LAYOUT_OPTIONS: LayoutOption[] = [
-  { value: "vertical", label: "Vertical", Icon: PanelRight },
-  { value: "horizontal", label: "Horizontal", Icon: PanelBottom },
+  { value: "vertical", label: "Vertical", Icon: PanelBottom },
+  { value: "horizontal", label: "Horizontal", Icon: PanelRight },
 ];
 
 /**

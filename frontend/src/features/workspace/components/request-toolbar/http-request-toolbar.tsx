@@ -3,7 +3,7 @@ import type { RequestTab, HttpMethod } from "../../types";
 import { Button } from "@/components";
 import { useSendHttpRequest } from "../../hooks";
 import { toast } from "sonner";
-import { normalizeHeaders } from "@/lib/utils";
+import { cn, normalizeHeaders } from "@/lib/utils";
 import { getErrorMessage } from "@/components/providers";
 import type { RequestSnapshot } from "../../types/response";
 import {
@@ -20,6 +20,10 @@ import { UrlInput } from "./url-input";
 import { MethodSelect } from "./method-select";
 import { ProtocolSelect } from "./protocol-select";
 import { EnvironmentSelect } from "./enironment-select";
+import { RequestToolbarShell } from "./request-toolbar-shell";
+import { RequestToolbarOverflowMenu } from "./request-toolbar-overflow-menu";
+import { ToolbarResponsiveButton } from "./toolbar-responsive-button";
+import { TOOLBAR_CONTROL_HEIGHT } from "./constants";
 import type { WorkspaceProtocol } from "../../types";
 import { buildRequestBody } from "../request-editor/request-body-editor/utils";
 import {
@@ -427,64 +431,67 @@ export function HttpRequestToolbar({ tab, onProtocolChange }: Props) {
     }
   };
 
+  const showSave = tab.isDirty || !tab.savedRequestId;
+
   return (
-    <div
-      className="
-        flex h-14 shrink-0
-        items-center gap-3
-        border-b border-border
-        bg-background px-4
-      "
-    >
-      <ProtocolSelect value={tab.protocol} onChange={onProtocolChange} />
+    <RequestToolbarShell
+      leading={
+        <ProtocolSelect value={tab.protocol} onChange={onProtocolChange} />
+      }
+      method={
+        <MethodSelect value={tab.method} onChange={handleMethodChange} />
+      }
+      url={
+        <UrlInput
+          value={tab.url}
+          onChange={handleUrlChange}
+          templateValues={templateValues}
+          pathParamValues={pathParamValues}
+        />
+      }
+      secondary={
+        <>
+          <EnvironmentSelect
+            environments={environments}
+            activeEnvironmentId={activeEnvironment?.id}
+            onSelect={setActiveEnvironment}
+          />
 
-      <MethodSelect value={tab.method} onChange={handleMethodChange} />
-
-      <UrlInput
-        value={tab.url}
-        onChange={handleUrlChange}
-        templateValues={templateValues}
-        pathParamValues={pathParamValues}
-      />
-
-      <EnvironmentSelect
-        environments={environments}
-        activeEnvironmentId={activeEnvironment?.id}
-        onSelect={setActiveEnvironment}
-      />
-
-      {(tab.isDirty || !tab.savedRequestId) && (
-        <Button variant="outline" onClick={() => void handleSave()} className="gap-2">
-          <Save className="h-4 w-4" />
-          Save
-        </Button>
-      )}
-
-      <Button
-        onClick={handleSendRequest}
-        disabled={tab.isSending || isPending}
-        className="
-          min-w-[96px] gap-2
-        "
-      >
-        {tab.isSending || isPending ? (
-          <>
-            <Loader2
-              className="
-                h-4 w-4
-                animate-spin
-              "
-            />
-            Sending
-          </>
-        ) : (
-          <>
-            <SendHorizonal className="h-4 w-4" />
-            Send
-          </>
-        )}
-      </Button>
-    </div>
+          {showSave ? (
+            <Button
+              variant="outline"
+              onClick={() => void handleSave()}
+              className={cn("gap-2 shadow-none hover:shadow-none", TOOLBAR_CONTROL_HEIGHT)}
+            >
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+          ) : null}
+        </>
+      }
+      primaryAction={
+        <ToolbarResponsiveButton
+          onClick={handleSendRequest}
+          disabled={tab.isSending || isPending}
+          ariaLabel="Send request"
+          tooltip="Send request"
+          icon={<SendHorizonal className="h-4 w-4" />}
+          label="Send"
+          isLoading={tab.isSending || isPending}
+          loadingIcon={<Loader2 className="h-4 w-4 animate-spin" />}
+          loadingLabel="Sending"
+        />
+      }
+      overflow={
+        <RequestToolbarOverflowMenu
+          environments={environments}
+          activeEnvironmentId={activeEnvironment?.id}
+          onSelectEnvironment={setActiveEnvironment}
+          showSave={showSave}
+          onSave={() => void handleSave()}
+        />
+      }
+    />
   );
 }
 
