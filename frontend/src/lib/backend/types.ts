@@ -138,6 +138,62 @@ export type SseCloseEventPayload = {
   tabId: string;
 };
 
+export type WsConnectPayload = {
+  connectionId: string;
+  tabId: string;
+  url: string;
+  headers: Record<string, string>;
+  subprotocols?: string[];
+  withCredentials: boolean;
+};
+
+export type WsConnectResult = {
+  connectionId: string;
+  error?: string;
+};
+
+export type WsSendPayload = {
+  connectionId: string;
+  messageType: "text" | "binary";
+  data: string;
+};
+
+export type WsHeaderPayload = {
+  key: string;
+  value: string;
+};
+
+export type WsOpenEventPayload = {
+  connectionId: string;
+  tabId: string;
+  statusCode: number;
+  statusText: string;
+  headers: WsHeaderPayload[];
+  subprotocol?: string;
+  error?: string;
+};
+
+export type WsMessageEventPayload = {
+  connectionId: string;
+  tabId: string;
+  messageType: "text" | "binary";
+  data: string;
+  byteLength: number;
+};
+
+export type WsErrorEventPayload = {
+  connectionId: string;
+  tabId: string;
+  error: string;
+};
+
+export type WsCloseEventPayload = {
+  connectionId: string;
+  tabId: string;
+  closeCode?: number;
+  closeReason?: string;
+};
+
 export type WorkspaceStatePayload = WorkspaceState;
 export type CollectionTreePayload = CollectionTree;
 export type CollectionPayload = Collection;

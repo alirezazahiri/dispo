@@ -125,6 +125,10 @@ export function WorkspaceTabs() {
               <Radio className="mr-2 h-3.5 w-3.5 text-violet-500" />
               New SSE Stream
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => createTab("websocket")}>
+              <Radio className="mr-2 h-3.5 w-3.5 text-amber-500" />
+              New WebSocket
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

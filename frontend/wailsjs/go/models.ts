@@ -912,6 +912,58 @@ export namespace api {
 		    return a;
 		}
 	}
+	export class WsConnectPayload {
+	    connectionId: string;
+	    tabId: string;
+	    url: string;
+	    headers: Record<string, string>;
+	    subprotocols?: string[];
+	    withCredentials: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new WsConnectPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connectionId = source["connectionId"];
+	        this.tabId = source["tabId"];
+	        this.url = source["url"];
+	        this.headers = source["headers"];
+	        this.subprotocols = source["subprotocols"];
+	        this.withCredentials = source["withCredentials"];
+	    }
+	}
+	export class WsConnectResult {
+	    connectionId: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WsConnectResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connectionId = source["connectionId"];
+	        this.error = source["error"];
+	    }
+	}
+	export class WsSendPayload {
+	    connectionId: string;
+	    messageType: string;
+	    data: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WsSendPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connectionId = source["connectionId"];
+	        this.messageType = source["messageType"];
+	        this.data = source["data"];
+	    }
+	}
 
 }
 

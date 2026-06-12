@@ -6,9 +6,20 @@ import type {
 import type { ResponseData } from "./response";
 import type { SseConnectionConfig, SseStreamState } from "./sse";
 import { DEFAULT_SSE_CONFIG, DEFAULT_SSE_STREAM } from "./sse";
+import type { WsConnectionConfig, WsStreamState } from "./websocket";
+import { DEFAULT_WS_CONFIG, DEFAULT_WS_STREAM } from "./websocket";
 
 export type { SseConnectionConfig, SseConnectionStatus, SseEventRecord, SseStreamState } from "./sse";
 export { DEFAULT_SSE_CONFIG, DEFAULT_SSE_STREAM } from "./sse";
+export type {
+  WsConnectionConfig,
+  WsConnectionStatus,
+  WsMessageDirection,
+  WsMessageRecord,
+  WsMessageType,
+  WsStreamState,
+} from "./websocket";
+export { DEFAULT_WS_CONFIG, DEFAULT_WS_STREAM } from "./websocket";
 
 export type WorkspaceProtocol = "http" | "websocket" | "sse" | "grpc";
 
@@ -223,6 +234,17 @@ export type RequestTab = {
    * Live SSE stream buffer and connection metadata for this tab.
    */
   sseStream: SseStreamState;
+
+  /**
+   * Protocol-specific configuration. Only meaningful when `protocol` is
+   * `"websocket"`.
+   */
+  wsConfig: WsConnectionConfig;
+
+  /**
+   * Live WebSocket message buffer and connection metadata for this tab.
+   */
+  wsStream: WsStreamState;
 
   response?: ResponseData;
 

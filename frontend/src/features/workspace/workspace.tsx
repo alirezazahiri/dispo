@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceTabs, WorkspaceView } from "./components/workspace";
 import { ensureSseRuntimeStarted } from "./protocols/sse/sse-runtime";
+import { ensureWsRuntimeStarted } from "./protocols/websocket/ws-runtime";
 import { useWorkspaceSetCurrentCollection } from "./stores";
 
 export function RequestWorkspace() {
@@ -10,6 +11,7 @@ export function RequestWorkspace() {
 
   useEffect(() => {
     ensureSseRuntimeStarted();
+    ensureWsRuntimeStarted();
   }, []);
 
   useEffect(() => {

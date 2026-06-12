@@ -119,3 +119,20 @@ export function SseClearOverflowItem({
     </DropdownMenuItem>
   );
 }
+
+type WsClearOverflowItemProps = {
+  disabled?: boolean;
+  onClear: () => void;
+};
+
+export function WsClearOverflowItem({
+  disabled = false,
+  onClear,
+}: WsClearOverflowItemProps) {
+  return (
+    <DropdownMenuItem disabled={disabled} onClick={onClear}>
+      <Trash2 />
+      Clear messages
+    </DropdownMenuItem>
+  );
+}

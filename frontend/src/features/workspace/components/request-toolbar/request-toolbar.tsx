@@ -1,8 +1,9 @@
 import type { RequestTab, WorkspaceProtocol } from "../../types";
-import { DEFAULT_SSE_STREAM } from "../../types";
+import { DEFAULT_SSE_STREAM, DEFAULT_WS_STREAM } from "../../types";
 import { useWorkspaceUpdateTab } from "../../stores";
 import { getProtocolDefinition } from "../../protocols/registry";
 import { disposeSseTab } from "../../protocols/sse/sse-runtime";
+import { disposeWsTab } from "../../protocols/websocket/ws-runtime";
 
 type Props = {
   tab: RequestTab;
@@ -21,12 +22,16 @@ export function RequestToolbar({ tab }: Props) {
     if (tab.protocol === "sse") {
       disposeSseTab(tab.id);
     }
+    if (tab.protocol === "websocket") {
+      disposeWsTab(tab.id);
+    }
 
     const nextDefinition = getProtocolDefinition(protocol);
     updateTab(tab.id, {
       protocol,
       ...nextDefinition.createTabDefaults(),
       sseStream: { ...DEFAULT_SSE_STREAM },
+      wsStream: { ...DEFAULT_WS_STREAM },
       isDirty: true,
     });
   };

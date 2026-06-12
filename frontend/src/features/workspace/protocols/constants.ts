@@ -21,7 +21,7 @@ export const PROTOCOL_META: ProtocolMeta[] = [
     label: "WebSocket",
     shortLabel: "WS",
     description: "Bidirectional WebSocket messaging",
-    availability: "coming_soon",
+    availability: "available",
   },
   {
     id: "grpc",

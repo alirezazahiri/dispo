@@ -2,6 +2,8 @@ import { nanoid } from "nanoid";
 import {
   DEFAULT_SSE_CONFIG,
   DEFAULT_SSE_STREAM,
+  DEFAULT_WS_CONFIG,
+  DEFAULT_WS_STREAM,
   RequestTab,
   WorkspaceProtocol,
 } from "../types";
@@ -61,6 +63,10 @@ export const createWorkspaceTab = (
     sseConfig: { ...DEFAULT_SSE_CONFIG },
 
     sseStream: { ...DEFAULT_SSE_STREAM },
+
+    wsConfig: { ...DEFAULT_WS_CONFIG },
+
+    wsStream: { ...DEFAULT_WS_STREAM },
 
     isSending: false,
 

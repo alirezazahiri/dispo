@@ -6,6 +6,7 @@ import (
 	"dispo/backend/httpservice"
 	importsvc "dispo/backend/import"
 	"dispo/backend/sse"
+	"dispo/backend/websocket"
 	"dispo/backend/scripting"
 	"embed"
 	"log"
@@ -23,6 +24,7 @@ func main() {
 	importService := importsvc.NewService(collectionsService)
 	httpService := httpservice.NewHTTPService()
 	sseService := sse.NewService()
+	wsService := websocket.NewService()
 	scriptService := scripting.NewService()
 
 	err := wails.Run(&options.App{
@@ -43,6 +45,7 @@ func main() {
 		OnStartup: func(ctx context.Context) {
 			httpService.Startup(ctx)
 			sseService.Startup(ctx)
+			wsService.Startup(ctx)
 			collectionsService.Startup(ctx)
 		},
 		OnShutdown: func(ctx context.Context) {
@@ -51,6 +54,7 @@ func main() {
 				log.Printf("failed to close collections service: %v", err)
 			}
 			sseService.Close()
+			wsService.Close()
 			if err := httpService.Close(); err != nil {
 				log.Printf("failed to close http service: %v", err)
 			}
@@ -58,6 +62,7 @@ func main() {
 		Bind: []interface{}{
 			httpService,
 			sseService,
+			wsService,
 			scriptService,
 			collectionsService,
 			importService,
