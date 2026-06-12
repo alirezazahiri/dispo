@@ -1,5 +1,6 @@
 import * as HttpService from "~/wailsjs/go/httpservice/HTTPService";
 import * as SseService from "~/wailsjs/go/sse/Service";
+import * as WsService from "~/wailsjs/go/websocket/Service";
 import * as CollectionsService from "~/wailsjs/go/collections/Service";
 import type {
   CollectionPayload,
@@ -14,6 +15,9 @@ import type {
   ScriptResultPayload,
   SseConnectPayload,
   SseConnectResult,
+  WsConnectPayload,
+  WsConnectResult,
+  WsSendPayload,
   WorkspaceStatePayload,
 } from "./types";
 
@@ -39,6 +43,13 @@ export const backendClient = {
     connect: (payload: SseConnectPayload) =>
       SseService.Connect(payload as any) as Promise<SseConnectResult>,
     disconnect: (connectionId: string) => SseService.Disconnect(connectionId),
+  },
+  websocket: {
+    connect: (payload: WsConnectPayload) =>
+      WsService.Connect(payload as any) as Promise<WsConnectResult>,
+    disconnect: (connectionId: string) => WsService.Disconnect(connectionId),
+    sendMessage: (payload: WsSendPayload) => WsService.SendMessage(payload as any),
+    readFileBase64: (path: string) => WsService.ReadFileBase64(path) as Promise<string>,
   },
   collections: {
     loadAll: () => CollectionsService.LoadAllCollections() as Promise<CollectionTreePayload[]>,

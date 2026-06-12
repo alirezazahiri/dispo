@@ -17,7 +17,9 @@ import {
   resolveBodyContentType,
   syncContentTypeHeader,
 } from "../components/request-editor/request-body-editor/utils";
+import { getProtocolDefinition } from "../protocols/registry";
 import { disposeSseTab } from "../protocols/sse/sse-runtime";
+import { disposeWsTab } from "../protocols/websocket/ws-runtime";
 import { resolveTabTitle } from "./tab-title";
 
 type WorkspaceLayout = "vertical" | "horizontal";
@@ -165,6 +167,14 @@ function sanitizeState(
       sseStream: {
         ...template.sseStream,
         ...tab.sseStream,
+      },
+      wsConfig: {
+        ...template.wsConfig,
+        ...tab.wsConfig,
+      },
+      wsStream: {
+        ...template.wsStream,
+        ...tab.wsStream,
       },
     };
   });
@@ -334,7 +344,10 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
       if (!targetCollectionId) {
         return;
       }
-      const tab = createWorkspaceTab(protocol, targetCollectionId);
+      const tab = {
+        ...createWorkspaceTab(protocol, targetCollectionId),
+        ...getProtocolDefinition(protocol).createTabDefaults(),
+      };
       set((state) => ({
         tabsById: {
           ...state.tabsById,
@@ -373,6 +386,9 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
         const tab = state.tabsById[tabId];
         if (tab?.protocol === "sse") {
           disposeSseTab(tabId);
+        }
+        if (tab?.protocol === "websocket") {
+          disposeWsTab(tabId);
         }
       }
 
