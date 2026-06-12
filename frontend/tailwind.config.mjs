@@ -1,4 +1,6 @@
 import * as tailwindAnimate from "tailwindcss-animate";
+import containerQueries from "@tailwindcss/container-queries";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -12,6 +14,9 @@ export default {
       },
     },
     extend: {
+      containers: {
+        "workspace-compact": "58rem",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -54,5 +59,5 @@ export default {
       },
     },
   },
-  plugins: [tailwindAnimate],
+  plugins: [tailwindAnimate, containerQueries],
 };

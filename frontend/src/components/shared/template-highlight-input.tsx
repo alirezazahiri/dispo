@@ -508,7 +508,7 @@ export function TemplateHighlightInput({
         }
       }}
     >
-      <div className={cn("relative w-full", className)}>
+      <div className={cn("relative min-w-0 w-full", className)}>
         <PopoverAnchor asChild>
           <div
             aria-hidden="true"

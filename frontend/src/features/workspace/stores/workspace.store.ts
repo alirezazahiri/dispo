@@ -39,6 +39,7 @@ type WorkspaceStore = {
 
   createTab: (protocol?: WorkspaceProtocol, collectionId?: string) => void;
   closeTab: (tabId: string) => void;
+  closeTabs: (tabIds: string[]) => void;
   setActiveTab: (tabId: string) => void;
   setCurrentCollection: (collectionId: string) => void;
   updateTab: (tabId: string, data: Partial<RequestTab>) => void;
@@ -356,39 +357,67 @@ export const useWorkspaceStore = create<WorkspaceStore & WorkspaceUiState>()(
     },
 
     closeTab: (tabId) => {
-      const state = get();
-      const tab = state.tabsById[tabId];
-      if (!tab) return;
+      get().closeTabs([tabId]);
+    },
 
-      if (tab.protocol === "sse") {
-        disposeSseTab(tabId);
+    closeTabs: (tabIds) => {
+      if (!tabIds.length) return;
+
+      const state = get();
+      const idsToClose = new Set(
+        tabIds.filter((tabId) => Boolean(state.tabsById[tabId])),
+      );
+      if (!idsToClose.size) return;
+
+      for (const tabId of idsToClose) {
+        const tab = state.tabsById[tabId];
+        if (tab?.protocol === "sse") {
+          disposeSseTab(tabId);
+        }
       }
 
-      const collectionId = tab.collectionId;
-      const currentOrder = state.tabOrderByCollection[collectionId] ?? [];
-      const nextOrder = currentOrder.filter((id) => id !== tabId);
+      const affectedCollectionIds = new Set<string>();
+      for (const tabId of idsToClose) {
+        const tab = state.tabsById[tabId];
+        if (tab) {
+          affectedCollectionIds.add(tab.collectionId);
+        }
+      }
+
       const nextTabsById = { ...state.tabsById };
-      delete nextTabsById[tabId];
+      for (const tabId of idsToClose) {
+        delete nextTabsById[tabId];
+      }
+
+      const nextTabOrderByCollection = { ...state.tabOrderByCollection };
+      const nextActiveTabByCollection = { ...state.activeTabIdByCollection };
+
+      for (const collectionId of affectedCollectionIds) {
+        const currentOrder = nextTabOrderByCollection[collectionId] ?? [];
+        const nextOrder = currentOrder.filter((id) => !idsToClose.has(id));
+        nextTabOrderByCollection[collectionId] = nextOrder;
+
+        const activeTabId = state.activeTabIdByCollection[collectionId];
+        if (activeTabId && idsToClose.has(activeTabId)) {
+          nextActiveTabByCollection[collectionId] =
+            nextOrder[nextOrder.length - 1] ?? "";
+        }
+      }
 
       let nextState: WorkspaceStore & WorkspaceUiState = {
         ...state,
         tabsById: nextTabsById,
-        tabOrderByCollection: {
-          ...state.tabOrderByCollection,
-          [collectionId]: nextOrder,
-        },
-        activeTabIdByCollection: { ...state.activeTabIdByCollection },
+        tabOrderByCollection: nextTabOrderByCollection,
+        activeTabIdByCollection: nextActiveTabByCollection,
       };
 
-      if (state.activeTabIdByCollection[collectionId] === tabId) {
-        nextState.activeTabIdByCollection[collectionId] =
-          nextOrder[nextOrder.length - 1] ?? "";
+      for (const collectionId of affectedCollectionIds) {
+        nextState = ensureCollectionHasTab(
+          nextState,
+          collectionId,
+        ) as WorkspaceStore & WorkspaceUiState;
       }
 
-      nextState = ensureCollectionHasTab(
-        nextState,
-        collectionId,
-      ) as WorkspaceStore & WorkspaceUiState;
       set(nextState);
       scheduleWorkspaceSave(get);
     },

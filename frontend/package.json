@@ -43,6 +43,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@tailwindcss/container-queries": "^0.1.1",
     "@types/node": "^25.8.0",
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",

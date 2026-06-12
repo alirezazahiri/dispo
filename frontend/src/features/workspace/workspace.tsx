@@ -20,10 +20,10 @@ export function RequestWorkspace() {
   }, [params.id, setCurrentCollection]);
 
   return (
-    <>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <WorkspaceTabs />
 
       <WorkspaceView />
-    </>
+    </div>
   );
 }

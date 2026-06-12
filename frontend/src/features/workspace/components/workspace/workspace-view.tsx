@@ -10,10 +10,10 @@ export function WorkspaceView() {
   }
 
   return (
-    <>
+    <div className="@container/workspace flex min-h-0 min-w-0 flex-1 flex-col">
       <RequestToolbar tab={activeTab} />
 
       <WorkspacePanels tab={activeTab} />
-    </>
+    </div>
   );
 }

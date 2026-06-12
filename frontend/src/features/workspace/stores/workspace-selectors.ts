@@ -52,6 +52,8 @@ export const useWorkspaceCreateTab = () => useWorkspaceStore((state) => state.cr
 
 export const useWorkspaceCloseTab = () => useWorkspaceStore((state) => state.closeTab);
 
+export const useWorkspaceCloseTabs = () => useWorkspaceStore((state) => state.closeTabs);
+
 export const useWorkspaceUpdateTab = () => useWorkspaceStore((state) => state.updateTab);
 
 export const useWorkspaceSetActiveTab = () =>

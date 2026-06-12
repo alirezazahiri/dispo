@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { WorkspaceProtocol } from "../../types";
 import { getProtocolMeta, PROTOCOL_META } from "../../protocols/constants";
+import { TOOLBAR_CONTROL_HEIGHT } from "./constants";
 
 type ProtocolSelectProps = {
   value: WorkspaceProtocol;
@@ -19,15 +20,24 @@ type ProtocolSelectProps = {
 };
 
 export function ProtocolSelect({ value, onChange }: ProtocolSelectProps) {
+  const meta = getProtocolMeta(value);
+
   return (
     <Select
       value={value}
       onValueChange={(next) => onChange(next as WorkspaceProtocol)}
     >
-      <SelectTrigger className="w-[7.5rem] shrink-0">
-        <SelectValue placeholder="Protocol">
-          {getProtocolMeta(value).shortLabel}
-        </SelectValue>
+      <SelectTrigger
+        className={cn(
+          TOOLBAR_CONTROL_HEIGHT,
+          "w-[3.75rem] shrink-0 px-2 text-xs font-semibold",
+          "[&_svg:last-child]:h-3.5 [&_svg:last-child]:w-3.5",
+          "@workspace-compact/workspace:w-[7.5rem] @workspace-compact/workspace:px-3",
+          "@workspace-compact/workspace:text-sm",
+          "@workspace-compact/workspace:[&_svg:last-child]:h-4 @workspace-compact/workspace:[&_svg:last-child]:w-4",
+        )}
+      >
+        <SelectValue placeholder="Protocol">{meta.shortLabel}</SelectValue>
       </SelectTrigger>
       <SelectContent align="start">
         {PROTOCOL_META.map((protocol) => (
