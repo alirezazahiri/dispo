@@ -1,0 +1,33 @@
+app-id: io.github.alirezazahiri.dispo
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
+command: dispo
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=host
+modules:
+  - name: dispo
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 dispo /app/bin/dispo
+      - install -Dm644 io.github.alirezazahiri.dispo.desktop /app/share/applications/io.github.alirezazahiri.dispo.desktop
+      - install -Dm644 io.github.alirezazahiri.dispo.metainfo.xml /app/share/metainfo/io.github.alirezazahiri.dispo.metainfo.xml
+      - install -Dm644 icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.alirezazahiri.dispo.png
+      - install -Dm644 icons/256x256.png /app/share/icons/hicolor/256x256/apps/io.github.alirezazahiri.dispo.png
+    sources:
+      - type: file
+        path: ../../bin/dispo
+        dest-filename: dispo
+      - type: file
+        path: io.github.alirezazahiri.dispo.desktop
+      - type: file
+        path: io.github.alirezazahiri.dispo.metainfo.xml
+      - type: file
+        path: icons/128x128.png
+      - type: file
+        path: icons/256x256.png
