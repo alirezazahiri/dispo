@@ -1,0 +1,26 @@
+name: dispo
+arch: amd64
+platform: linux
+version: "{{ .Env.NFPM_VERSION }}"
+section: utils
+priority: optional
+maintainer: alirezazahiri <itsalireza.zr@gmail.com>
+description: API client for HTTP, SSE, and WebSocket
+homepage: https://github.com/alirezazahiri/dispo
+license: MIT
+depends:
+  - libwebkit2gtk-4.1-0
+  - libgtk-3-0
+contents:
+  - src: build/bin/dispo
+    dst: /usr/bin/dispo
+    file_info:
+      mode: 0755
+  - src: build/linux/flatpak/io.github.alirezazahiri.dispo.desktop
+    dst: /usr/share/applications/io.github.alirezazahiri.dispo.desktop
+  - src: build/linux/flatpak/io.github.alirezazahiri.dispo.metainfo.xml
+    dst: /usr/share/metainfo/io.github.alirezazahiri.dispo.metainfo.xml
+  - src: build/linux/flatpak/icons/128x128.png
+    dst: /usr/share/icons/hicolor/128x128/apps/io.github.alirezazahiri.dispo.png
+  - src: build/linux/flatpak/icons/256x256.png
+    dst: /usr/share/icons/hicolor/256x256/apps/io.github.alirezazahiri.dispo.png
