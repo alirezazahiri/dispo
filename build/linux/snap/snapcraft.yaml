@@ -1,0 +1,35 @@
+name: dispo
+title: dispo
+version: "0.0.0-dev"
+summary: API client for HTTP, SSE, and WebSocket
+description: |
+  dispo is a desktop API client for sending HTTP requests, streaming SSE events,
+  and working with WebSocket connections. Organize requests in collections,
+  manage environments, and inspect responses.
+grade: devel
+confinement: strict
+base: core22
+architectures:
+  - build-on: amd64
+    build-for: amd64
+
+layout:
+  /usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/webkit2gtk-4.1:
+    bind: $SNAP/gnome-platform/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/webkit2gtk-4.1
+
+apps:
+  dispo:
+    command: bin/dispo
+    extensions: [gnome]
+    environment:
+      WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+    plugs:
+      - home
+      - network
+      - network-bind
+      - removable-media
+
+parts:
+  dispo:
+    plugin: dump
+    source: stage
